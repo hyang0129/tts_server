@@ -72,3 +72,60 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 | DELETE | /voices/{id} | Delete a voice |
 | GET | /health | Engine status + active model |
 | GET | /models | List models with load status + VRAM |
+
+## Adding a new TTS engine
+
+When a user asks to add or integrate a new TTS model, follow this process exactly.
+The full rationale is in `docs/agentic-qwen3-tts-workflow.md` — read it before starting.
+
+### Step 1 — Require a source repo URL
+
+A GitHub (or other) repo URL is mandatory before any implementation work begins.
+
+- **If the user provided a URL:** proceed to Step 2.
+- **If the user provided only a name (e.g. "add Kokoro TTS"):** do NOT guess or
+  assume a repo. Instead, web-search for the model name and return 2–4 candidate
+  repos with their URLs, star counts, and a one-line description of each. Ask the
+  user to confirm which one to use. Do not proceed until a URL is confirmed.
+
+### Step 2 — Spin up the agent team
+
+Launch the following agents. The Researcher runs first; all others are unblocked
+once it delivers its memo.
+
+| Agent | Task |
+|-------|------|
+| **Researcher** | Fetch the confirmed repo URL and any linked HuggingFace model card. Extract: model ID, Python inference API (exact class/function signatures), dependencies, VRAM footprint, supported paralinguistic tags, voice control surface (cloning, style, description), sampling parameters. Produce a feature delta table against Chatterbox and Higgs. Cite every source URL. |
+| **Implementer** | Using the Researcher memo, write `app/engine_<name>.py` subclassing `TTSEngine`. Register in `model_manager.py`. Expose all features (including any new paralinguistic tags or voice params) as optional fields in `main.py`. Update `voices.py` `compatible_models` if cloning is supported. |
+| **Test writer** | Add engine test cases to `tests/test_integration.py`. Add manifest entries to `generate_artifacts.py`. Exclude the `long` text fixture from this engine's STT validation threshold (it is a known edge case with military proper nouns that cause STT noise for all models). |
+| **Docs updater** | Update `README.md` VRAM table, `docs/api.md` with new model name and any new params, and this `CLAUDE.md` under Environment variables and Architecture. |
+| **Validator** | Run `ruff check .`. Confirm all five `TTSEngine` abstract methods are implemented. Confirm no existing engine tests are broken. Run STT validation for the new engine (≥ 85% pass rate, excluding `long` fixtures). Report pass/fail on every checklist item. |
+
+### Step 3 — Agent self-review (before human handoff)
+
+The Validator must confirm every item below before surfacing the work to the user:
+
+```
+[ ] engine_<name>.py subclasses TTSEngine with all 5 methods
+[ ] unload() calls gc.collect() + torch.cuda.empty_cache()
+[ ] model_manager.py — engine is registered
+[ ] main.py — engine-specific params are optional fields with defaults
+[ ] voices.py — compatible_models updated if cloning is supported
+[ ] New paralinguistic tags (if any) are documented in docs/api.md
+[ ] Env vars documented in README and CLAUDE.md
+[ ] docs/api.md updated
+[ ] test_integration.py — test cases present
+[ ] generate_artifacts.py — manifest entries present, long fixture excluded
+[ ] ruff check . — PASSED
+[ ] STT validation — ≥ 85% pass (excluding long fixtures)
+[ ] Chatterbox and Higgs existing tests unaffected
+```
+
+If any item fails, the relevant agent fixes it before escalating.
+
+### Step 4 — Human review
+
+Present the user with the generated WAV artifacts from `tests/artifacts/`.
+The human reviews audio quality only — intelligibility, voice character, absence
+of artifacts. They do not review code. Pass → merge. Fail → the user describes
+the specific problem and the Implementer fixes it.
