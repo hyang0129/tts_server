@@ -1,0 +1,19 @@
+[project]
+name = "tts-server"
+version = "0.1.0"
+description = "Consolidated TTS server supporting multiple model backends"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.0",
+    "soundfile>=0.12",
+    "numpy>=1.24",
+    "torch>=2.0",
+]
+
+[project.optional-dependencies]
+chatterbox = ["chatterbox-tts"]
+
+[tool.ruff]
+line-length = 100

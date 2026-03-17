@@ -1,0 +1,172 @@
+{
+  "artifacts": [
+    {
+      "filename": "short_kronii_cb.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "chatterbox",
+      "voice": "kronii_cb",
+      "text_label": "short"
+    },
+    {
+      "filename": "short_nimi_cb.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "chatterbox",
+      "voice": "nimi_cb",
+      "text_label": "short"
+    },
+    {
+      "filename": "short_default_male.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "short"
+    },
+    {
+      "filename": "short_default_female.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "short"
+    },
+    {
+      "filename": "medium_kronii_cb.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
+      "model": "chatterbox",
+      "voice": "kronii_cb",
+      "text_label": "medium"
+    },
+    {
+      "filename": "medium_nimi_cb.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
+      "model": "chatterbox",
+      "voice": "nimi_cb",
+      "text_label": "medium"
+    },
+    {
+      "filename": "medium_default_male.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "medium"
+    },
+    {
+      "filename": "medium_default_female.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "medium"
+    },
+    {
+      "filename": "long_kronii_cb.wav",
+      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger \u2014 regardless of its actual type \u2014 because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times \u2014 winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
+      "model": "chatterbox",
+      "voice": "kronii_cb",
+      "text_label": "long"
+    },
+    {
+      "filename": "long_nimi_cb.wav",
+      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger \u2014 regardless of its actual type \u2014 because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times \u2014 winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
+      "model": "chatterbox",
+      "voice": "nimi_cb",
+      "text_label": "long"
+    },
+    {
+      "filename": "long_default_male.wav",
+      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger \u2014 regardless of its actual type \u2014 because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times \u2014 winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "long"
+    },
+    {
+      "filename": "long_default_female.wav",
+      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger \u2014 regardless of its actual type \u2014 because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times \u2014 winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "long"
+    },
+    {
+      "filename": "ten_second_kronii_cb.wav",
+      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
+      "model": "chatterbox",
+      "voice": "kronii_cb",
+      "text_label": "ten_second"
+    },
+    {
+      "filename": "ten_second_nimi_cb.wav",
+      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
+      "model": "chatterbox",
+      "voice": "nimi_cb",
+      "text_label": "ten_second"
+    },
+    {
+      "filename": "ten_second_default_male.wav",
+      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "ten_second"
+    },
+    {
+      "filename": "ten_second_default_female.wav",
+      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "ten_second"
+    },
+    {
+      "filename": "numbers_kronii_cb.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "chatterbox",
+      "voice": "kronii_cb",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "numbers_nimi_cb.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "chatterbox",
+      "voice": "nimi_cb",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "numbers_default_male.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "numbers_default_female.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "expressive_kronii_cb.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "chatterbox",
+      "voice": "kronii_cb",
+      "text_label": "expressive"
+    },
+    {
+      "filename": "expressive_nimi_cb.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "chatterbox",
+      "voice": "nimi_cb",
+      "text_label": "expressive"
+    },
+    {
+      "filename": "expressive_default_male.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "expressive"
+    },
+    {
+      "filename": "expressive_default_female.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "expressive"
+    }
+  ]
+}
