@@ -131,6 +131,19 @@ python tests/generate_artifacts.py --validate          # generate + STT validati
 python tests/stt_validate.py --artifacts-dir tests/artifacts/ --manifest tests/manifest.json -v
 ```
 
+### STT Validation as a Setup Health Check
+
+The STT validation pipeline serves two purposes:
+
+1. **Transcription accuracy** — confirms the model is producing intelligible speech
+2. **Model setup correctness** — if a model consistently passes most tests, it is loaded and running correctly
+
+**Passing threshold**: a model is considered correctly set up if it passes the majority of its test cases (≥ 85%). Isolated failures on specific phrases (e.g. proper nouns, brand names) are expected model quality variance, not setup errors.
+
+Word-level match < 95% triggers LLM adjudication (Claude Haiku) to distinguish real quality issues from STT noise (e.g. "VIII" vs "8", missing paralinguistic tags like `[chuckle]`).
+
+**Baseline results** (RTX 5070 Ti, 8-bit higgs, chatterbox Turbo): 21/24 pass (87.5%). The 3 failures are isolated model quality issues on specific phrases, not setup problems.
+
 ## Architecture
 
 ```

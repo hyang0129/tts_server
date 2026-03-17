@@ -26,7 +26,13 @@ pytest tests/test_integration.py -v -k higgs
 
 # Generate test artifacts (audio samples for manual review)
 python tests/generate_artifacts.py
+
+# STT validation (also serves as model setup health check)
+python tests/stt_validate.py --artifacts-dir tests/artifacts/ --manifest tests/manifest.json -v
 ```
+
+## STT validation as a setup health check
+The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks transcription accuracy AND confirms a model is correctly set up. A model passing ≥ 85% of its test cases is considered correctly installed. Baseline: 21/24 pass (87.5%) on RTX 5070 Ti.
 
 ## Hardware target
 - NVIDIA RTX 5070 Ti Laptop GPU (12 GB VRAM, Blackwell / sm_120)

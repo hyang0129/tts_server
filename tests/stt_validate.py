@@ -272,20 +272,30 @@ def validate_batch(
         passed, match_pct, transcription = validate_single(
             wav_path, expected_text, threshold, verbose=verbose
         )
+
+        llm_result = None
+        if not passed:
+            llm_result = llm_adjudicate(expected_text, transcription)
+            if llm_result and llm_result.get("verdict") == "pass":
+                passed = True
+                if verbose:
+                    print(f"  LLM override → PASS  ({llm_result['reason'][:80]})")
+
         if passed:
             pass_count += 1
         else:
             fail_count += 1
 
-        results.append(
-            {
-                "file": filename,
-                "status": "pass" if passed else "fail",
-                "match_pct": round(match_pct, 1),
-                "expected": expected_text,
-                "transcribed": transcription,
-            }
-        )
+        entry = {
+            "file": filename,
+            "status": "pass" if passed else "fail",
+            "match_pct": round(match_pct, 1),
+            "expected": expected_text,
+            "transcribed": transcription,
+        }
+        if llm_result:
+            entry["llm_adjudication"] = llm_result
+        results.append(entry)
 
     total = pass_count + fail_count
     summary = {

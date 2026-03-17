@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 import urllib.request
@@ -196,8 +197,10 @@ def clone_voice(
         return voice_id
     except urllib.error.HTTPError as exc:
         if exc.code == 409:
-            print(f"  Voice '{voice_name}' already exists, reusing")
-            return voice_name
+            # Server slugifies the name (underscores → dashes); return the slug.
+            slug = re.sub(r"[^a-z0-9]+", "-", voice_name.lower()).strip("-")
+            print(f"  Voice '{voice_name}' already exists, reusing (id={slug})")
+            return slug
         print(f"  ERROR cloning voice '{voice_name}': {exc}")
         return None
     except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
