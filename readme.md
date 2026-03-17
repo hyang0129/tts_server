@@ -1,6 +1,17 @@
 # TTS Server
 
-Consolidated FastAPI server serving multiple TTS model backends behind a unified API. Currently supports **Chatterbox Turbo** and **Higgs Audio v2**.
+FastAPI TTS server serving multiple model backends (Chatterbox Turbo, Higgs Audio v2) behind a unified API. This is the voice layer for the **video_agent** AI podcast pipeline — it exposes TTS model capabilities so video_agent can synthesize scripts into audio.
+
+## Purpose
+
+The primary goal is **human-like speech quality** for an AI podcast host. Features are prioritised in that order: anything that makes output sound more like a real person talking (natural prosody, expressiveness, breath sounds, consistent voice identity) takes precedence over throughput or parameter breadth.
+
+The **video_agent** repo handles script writing and episode orchestration. This server's job is to faithfully render those scripts. API design reflects that relationship:
+
+- Scripts with inline paralinguistic tags (`[laugh]`, `[sigh]`, etc.) pass through directly to the engine
+- Voice IDs persist across episodes for consistent host identity
+- Delivery style is controllable per-segment via temperature, scene descriptions, or speaker descriptions
+- Model selection can vary per segment or speaker
 
 ## Features
 
@@ -9,7 +20,9 @@ Consolidated FastAPI server serving multiple TTS model backends behind a unified
 - **Auto-unload**: Models unloaded after 60s idle to free VRAM
 - **VRAM-aware**: Only enables models that fit within configured VRAM budget
 - **Model swap**: Transparent swap when switching between models (unload → load)
-- **Voice management**: Clone, blend (chatterbox), and description-only generation (higgs)
+- **Voice management**: Clone, blend (Chatterbox), and description-only generation (Higgs)
+- **Paralinguistic tags**: Inline non-speech sounds for natural delivery
+- **Scene/speaker descriptions**: Prose-level control over delivery character (Higgs)
 
 ## Setup
 
@@ -104,7 +117,9 @@ curl http://localhost:8000/health
 | GET | `/health` | Server + engine status |
 | GET | `/models` | List models with load status and VRAM |
 
-See [docs/api.md](docs/api.md) for full request/response schemas.
+See [docs/api.md](docs/api.md) for full request/response schemas. Model-specific parameters, quality tips, and paralinguistic tag references:
+- [docs/chatterbox.md](docs/chatterbox.md) — voice blending, sampling params, podcast quality tips
+- [docs/higgs.md](docs/higgs.md) — scene/speaker descriptions, cloning requirements, podcast quality tips
 
 ## VRAM Usage (RTX 5070 Ti)
 

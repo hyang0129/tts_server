@@ -20,6 +20,9 @@ env/
 # Test artifacts (generated audio + reports)
 tests/artifacts/
 
+# Runtime voice data (cloned/blended by users, not source)
+voices/
+
 # Editor
 .vscode/
 *.swp
