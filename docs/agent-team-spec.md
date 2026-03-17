@@ -8,14 +8,17 @@ Referenced by `CLAUDE.md` and `agentic-qwen3-tts-workflow.md`.
 ## Execution Order
 
 ```
-[Researcher] ──► [Implementer] ──┐
-                                  ├──► [Validator] ──► human audio review
-             ──► [Test Writer]  ──┤
-             ──► [Docs Updater] ──┘
+[Issue + Draft PR] ──► [Researcher] ──► [Implementer] ──┐
+                                                          ├──► [Validator] ──► [PR ready for review] ──► human audio review
+                                    ──► [Test Writer]   ──┤
+                                    ──► [Docs Updater]  ──┘
 ```
 
-Researcher is sequential and blocking. Implementer, Test Writer, and Docs Updater
-run in parallel once the Researcher memo is available. Validator runs last.
+Issue and draft PR are created first, before any implementation — work is visible
+and trackable from day one. Researcher runs next and is blocking. Implementer,
+Test Writer, and Docs Updater run in parallel once the Researcher memo is
+available. Validator runs last and marks the PR ready for review once all checks
+are green.
 
 ---
 
@@ -126,10 +129,21 @@ with the specific failure. Does not escalate to human until all items are green.
 
 ## Human Handoff
 
-Once Validator reports all green, present the user with:
-1. The generated WAV files from `tests/artifacts/` for the new engine
-2. A one-line summary of any new features exposed (e.g. "Qwen3 adds `[whisper]` and `[gasp]` tags")
+Once Validator reports all green:
 
-The human listens to the audio. They do not review code.
-**Pass** → merge.
-**Fail** → user describes the specific problem; route back to Implementer.
+1. **Mark the draft PR ready for review.** Update the PR description to include:
+   - Link to source repo / HuggingFace model card
+   - Feature delta table (from Researcher memo)
+   - Validator checklist with all items marked green
+   - Instructions for the reviewer: "Listen to the WAV files in `tests/artifacts/` for the new engine before approving"
+
+2. **Present to the user:**
+   - PR URL
+   - The generated WAV files from `tests/artifacts/` for the new engine
+   - One-line summary of any new features (e.g. "Qwen3 adds `[whisper]` and `[gasp]` tags")
+
+The human listens to the audio and reviews the PR.
+**Approved** → merge (human merges, or explicitly asks Claude to merge).
+**Rejected** → user describes the specific problem; close the PR, route back to Implementer, open a new PR once fixed.
+
+**Claude must not merge the PR without explicit human approval.**

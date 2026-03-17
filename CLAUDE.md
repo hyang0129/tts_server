@@ -88,7 +88,20 @@ A GitHub (or other) repo URL is mandatory before any implementation work begins.
   repos with their URLs, star counts, and a one-line description of each. Ask the
   user to confirm which one to use. Do not proceed until a URL is confirmed.
 
-### Step 2 — Spin up the agent team
+### Step 2 — Create tracking issue and draft PR
+
+Before any implementation begins:
+
+1. Create a GitHub issue: `feat: add <ModelName> TTS engine`
+   - Source repo URL
+   - Brief description of the model
+   - Note that implementation is in progress
+
+2. Create a feature branch (`feat/add-<name>-tts`) and open a **draft PR** referencing
+   the issue. This makes the work visible and trackable from the start.
+   The PR will be marked ready for review once the Validator is fully green.
+
+### Step 3 — Spin up the agent team
 
 Launch the following agents. The Researcher runs first; all others are unblocked
 once it delivers its memo.
@@ -101,7 +114,7 @@ once it delivers its memo.
 | **Docs updater** | Update `README.md` VRAM table, `docs/api.md` with new model name and any new params, and this `CLAUDE.md` under Environment variables and Architecture. |
 | **Validator** | Run `ruff check .`. Confirm all five `TTSEngine` abstract methods are implemented. Confirm no existing engine tests are broken. Run STT validation for the new engine (≥ 85% pass rate, excluding `long` fixtures). Report pass/fail on every checklist item. |
 
-### Step 3 — Agent self-review (before human handoff)
+### Step 4 — Agent self-review (before human handoff)
 
 The Validator must confirm every item below before surfacing the work to the user:
 
@@ -123,9 +136,22 @@ The Validator must confirm every item below before surfacing the work to the use
 
 If any item fails, the relevant agent fixes it before escalating.
 
-### Step 4 — Human review
+### Step 5 — Mark PR ready for review
 
-Present the user with the generated WAV artifacts from `tests/artifacts/`.
-The human reviews audio quality only — intelligibility, voice character, absence
-of artifacts. They do not review code. Pass → merge. Fail → the user describes
-the specific problem and the Implementer fixes it.
+Once the Validator is fully green, update the draft PR (created in Step 2):
+- Mark it ready for review (remove draft status)
+- Update the PR body with the Validator checklist (all green), the feature delta
+  summary from the Researcher memo, and instructions for the reviewer to listen
+  to the WAV artifacts before approving
+
+### Step 6 — Human review
+
+Present the user with:
+- The PR URL
+- The generated WAV files from `tests/artifacts/` for the new engine
+- One-line summary of any new features exposed
+
+The human listens to the audio and approves or rejects the PR.
+**Do not merge without explicit human approval.**
+Approved → human merges (or explicitly asks Claude to merge).
+Rejected → describe the problem, close the PR, fix, open a new one.
