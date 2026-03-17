@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.engine_chatterbox import ChatterboxEngine
 from app.engine_higgs import HiggsEngine
+from app.engine_qwen3 import Qwen3Engine
 from app.model_manager import ModelManager
 from app.voices import (
     DEFAULT_MAX_DURATION_S,
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     manager = ModelManager(available_vram_mb=AVAILABLE_VRAM_MB)
     manager.register_engine(ChatterboxEngine())
     manager.register_engine(HiggsEngine())
+    manager.register_engine(Qwen3Engine())
 
     available = manager.available_models()
     logger.info(
@@ -84,6 +86,10 @@ class TTSRequest(BaseModel):
     ras_win_len: int | None = None
     ras_win_max_num_repeat: int | None = None
     force_audio_gen: bool | None = None
+    # Qwen3-specific
+    qwen3_language: str | None = None
+    qwen3_speaker: str | None = None
+    qwen3_instruct: str | None = None
 
     @field_validator("text")
     @classmethod
@@ -196,6 +202,20 @@ async def synthesize(req: TTSRequest) -> Response:
             params["ras_win_max_num_repeat"] = req.ras_win_max_num_repeat
         if req.force_audio_gen is not None:
             params["force_audio_gen"] = req.force_audio_gen
+    elif model_name == "qwen3":
+        if req.qwen3_language is not None:
+            params["qwen3_language"] = req.qwen3_language
+        if req.qwen3_speaker is not None:
+            params["qwen3_speaker"] = req.qwen3_speaker
+        if req.qwen3_instruct is not None:
+            params["qwen3_instruct"] = req.qwen3_instruct
+        # speaker_description doubles as instruct for voice-design mode
+        if req.speaker_description is not None:
+            params["speaker_description"] = req.speaker_description
+        if req.seed is not None:
+            params["seed"] = req.seed
+        if req.max_new_tokens is not None:
+            params["max_new_tokens"] = req.max_new_tokens
 
     async with app.state.lock:
         engine = await manager.ensure_loaded(model_name)

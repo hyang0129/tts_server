@@ -209,6 +209,8 @@ class VoiceStore:
             txt_path = voice_dir / "reference.txt"
             txt_path.write_text(reference_text)
             compatible.append("higgs")
+            # Qwen3 Base model also requires a transcript for voice cloning.
+            compatible.append("qwen3")
         # Chatterbox can use any reference WAV (no transcript needed).
         compatible.append("chatterbox")
 

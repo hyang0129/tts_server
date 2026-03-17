@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate TTS audio artifacts from the consolidated TTS server.
 
-Generates WAVs for both chatterbox and higgs models via the unified /tts endpoint.
+Generates WAVs for chatterbox, higgs, and qwen3 models via the unified /tts endpoint.
 
 Usage:
     python tests/generate_artifacts.py [--base-url http://localhost:8000] [--model both] [--dry-run] [--validate]
@@ -9,7 +9,9 @@ Usage:
 Artifact plan:
     Chatterbox: 6 texts x 2 clone voices (kronii_cb, nimi_cb) = 12 WAVs
     Higgs:      6 texts x 2 description voices (default_male, default_female) = 12 WAVs
-    Total:      24 WAVs
+    Qwen3:      5 texts x 2 description voices (qwen3_warm, qwen3_neutral) = 10 WAVs
+                (long fixture excluded from STT threshold — known edge case with proper nouns)
+    Total:      34 WAVs
 """
 
 from __future__ import annotations
@@ -57,6 +59,14 @@ HIGGS_VOICES = {
         "neutral American accent, warm narration style"
     ),
 }
+
+# Qwen3 voices: instruct-based via VoiceDesign / Base model.
+# long fixture is excluded (known STT edge case with military proper nouns).
+QWEN3_VOICES = {
+    "qwen3_warm": "A warm, clear female voice with calm narration style",
+    "qwen3_neutral": "A neutral male voice with clear enunciation and moderate pace",
+}
+QWEN3_SKIP_LABELS = {"long"}
 
 # ---------------------------------------------------------------------------
 # Text samples -- 6 per voice, diverse content
@@ -262,7 +272,7 @@ def load_manifest() -> dict:
 def build_plan(model_filter: str) -> list[tuple[str, str, str, str]]:
     """Build generation plan: list of (filename, text, voice_name, model).
 
-    model_filter: 'chatterbox', 'higgs', or 'both'
+    model_filter: 'chatterbox', 'higgs', 'qwen3', or 'both'
     """
     plan: list[tuple[str, str, str, str]] = []
     for text_label, text_info in TEXTS.items():
@@ -274,6 +284,11 @@ def build_plan(model_filter: str) -> list[tuple[str, str, str, str]]:
             for voice_name in HIGGS_VOICES:
                 fname = artifact_filename(text_label, voice_name)
                 plan.append((fname, text_info["text"], voice_name, "higgs"))
+        if model_filter in ("qwen3", "both"):
+            if text_label not in QWEN3_SKIP_LABELS:
+                for voice_name in QWEN3_VOICES:
+                    fname = artifact_filename(text_label, voice_name)
+                    plan.append((fname, text_info["text"], voice_name, "qwen3"))
     return plan
 
 
@@ -346,6 +361,11 @@ def run(
             wav_bytes = synthesize(base_url, text, model=model, voice_id=vid)
         elif model == "higgs":
             desc = HIGGS_VOICES[voice_name]
+            wav_bytes = synthesize(
+                base_url, text, model=model, speaker_description=desc
+            )
+        elif model == "qwen3":
+            desc = QWEN3_VOICES[voice_name]
             wav_bytes = synthesize(
                 base_url, text, model=model, speaker_description=desc
             )
@@ -501,7 +521,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        choices=["chatterbox", "higgs", "both"],
+        choices=["chatterbox", "higgs", "qwen3", "both"],
         default="both",
         help="Which model(s) to generate for (default: both)",
     )

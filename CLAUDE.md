@@ -9,6 +9,7 @@ Consolidated FastAPI TTS server that serves multiple model backends (Chatterbox,
 - **app/engine_base.py** — TTSEngine ABC
 - **app/engine_chatterbox.py** — Chatterbox Turbo wrapper
 - **app/engine_higgs.py** — Higgs Audio wrapper (requires faster-higgs-audio repo)
+- **app/engine_qwen3.py** — Qwen3-TTS wrapper (requires qwen-tts package)
 - **app/voices.py** — Unified VoiceStore with compatible_models tracking
 
 ## Key commands
@@ -47,6 +48,9 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 - `HIGGS_REPO_PATH` — path to faster-higgs-audio repo (default /tmp/faster-higgs-audio)
 - `HIGGS_MODEL_ID` — HuggingFace model ID for higgs
 - `HIGGS_TOKENIZER_ID` — HuggingFace tokenizer ID for higgs
+- `QWEN3_MODEL_ID` — HuggingFace model ID for qwen3 (default Qwen/Qwen3-TTS-12Hz-1.7B-Base)
+- `QWEN3_DTYPE` — weight dtype for qwen3 (bfloat16 or float16, default bfloat16)
+- `QWEN3_VRAM_MB` — override VRAM budget estimate for qwen3 (default 5500)
 
 ## Conventions
 - Python 3.11, type hints throughout
