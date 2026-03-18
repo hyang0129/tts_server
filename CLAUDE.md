@@ -12,6 +12,25 @@ Consolidated FastAPI TTS server that serves multiple model backends (Chatterbox,
 - **app/engine_qwen3.py** — Qwen3-TTS wrapper (requires qwen-tts package)
 - **app/voices.py** — Unified VoiceStore with compatible_models tracking
 
+## Starting the server (agent instructions)
+
+The agent can and should start the server autonomously when needed (e.g. before running
+generate_artifacts.py or integration tests). Use the `higgs_tts` venv — it contains all
+three engines (qwen_tts, chatterbox-tts, faster-higgs-audio deps) and fastapi/uvicorn.
+
+```bash
+# Start in background (recommended — server takes ~5s to become ready)
+AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/higgs_tts/bin/uvicorn app.main:app \
+    --host 0.0.0.0 --port 8000 > /tmp/tts_server.log 2>&1 &
+
+# Wait for ready
+curl --retry 10 --retry-delay 2 --retry-connrefused -s http://localhost:8000/health
+```
+
+The `.env` file in the repo root is auto-loaded by the server; it contains `HF_TOKEN` and
+`ANTHROPIC_API_KEY`. For qwen3 Base voice cloning, the default `QWEN3_MODEL_ID` is already
+set to the Base model — no override needed.
+
 ## Key commands
 ```bash
 # Run the server
@@ -31,6 +50,26 @@ python tests/generate_artifacts.py
 # STT validation (also serves as model setup health check)
 python tests/stt_validate.py --artifacts-dir tests/artifacts/ --manifest tests/manifest.json -v
 ```
+
+## Qwen3 Base voice cloning: reference text requirements
+
+When cloning a voice for the Base model, `reference_text` must match **only the first
+`_MAX_REF_SECONDS` (8s) of audio**, because the engine trims the reference audio to 8s
+before encoding. Providing the full transcript of a longer clip causes a mismatch that
+makes the model prepend the reference transcript to generated audio.
+
+To get an accurate 8s transcript, transcribe the trimmed audio with Whisper:
+```python
+import scipy.io.wavfile, tempfile
+from tests.stt_validate import transcribe_wav
+sr, data = scipy.io.wavfile.read("voices/<id>/reference.wav")
+with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+    scipy.io.wavfile.write(f.name, sr, data[:int(8.0 * sr)])
+    text = transcribe_wav(f.name)  # use this as reference_text
+```
+
+If you update `reference.txt`, delete `qwen3_prompt.pkl` (and any downstream blend pkls)
+so the engine recomputes the prompt on the next request.
 
 ## STT validation as a setup health check
 The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks transcription accuracy AND confirms a model is correctly set up. A model passing ≥ 85% of its test cases is considered correctly installed. Baseline: 21/24 pass (87.5%) on RTX 5070 Ti.
@@ -58,6 +97,10 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 - One model in VRAM at a time; swap on request
 - Default model is chatterbox (when model field omitted from /tts)
 - Chatterbox and Higgs use separate venvs due to incompatible torch versions
+
+## Generated audio files
+- **`tests/artifacts/`** — manifest-tracked WAV samples produced by `generate_artifacts.py`. Git-ignored; regenerate with `python tests/generate_artifacts.py`.
+- **`tests/samples/`** — ad-hoc / exploratory audio (one-off voice tests, blending experiments, etc.). Also git-ignored. When generating temp audio during development, save it here rather than `/tmp` so it persists across sessions and stays co-located with the repo. Never save generated audio to system `/tmp`.
 
 ## API contract
 - The API is consumed by video_agent and potentially other repos. Changes to request/response shapes, status codes, or headers can break clients.

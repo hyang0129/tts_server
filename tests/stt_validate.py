@@ -39,9 +39,9 @@ if _env_path.exists():
             key, _, val = line.partition("=")
             os.environ.setdefault(key.strip(), val.strip())
 
-WHISPER_MODEL_SIZE = "medium"
-WHISPER_DEVICE = "cpu"
-WHISPER_COMPUTE_TYPE = "int8"
+WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "medium")
+WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cuda" if __import__("torch").cuda.is_available() else "cpu")
+WHISPER_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "float16" if WHISPER_DEVICE == "cuda" else "int8")
 DEFAULT_THRESHOLD = 95.0
 
 

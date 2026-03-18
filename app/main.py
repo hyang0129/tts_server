@@ -169,6 +169,12 @@ async def synthesize(req: TTSRequest) -> Response:
                 conditionals_path = str(cond_path)
             else:
                 voice_ref_path = str(voice_store.get_reference_path(req.voice))
+        elif model_name == "qwen3":
+            # Blended qwen3 voices have no reference.wav — their identity lives entirely
+            # in qwen3_prompt.pkl.  We still pass the expected reference.wav path so the
+            # engine can locate the sibling pkl via Path(voice_ref_path).parent.
+            voice_ref_path = str(voice_store.get_reference_path(req.voice))
+            voice_ref_text = voice_store.get_reference_text(req.voice)
         else:
             voice_ref_path = str(voice_store.get_reference_path(req.voice))
             voice_ref_text = voice_store.get_reference_text(req.voice)
@@ -281,7 +287,7 @@ async def clone_voice(
 
 
 # ---------------------------------------------------------------------------
-# POST /voices/blend (chatterbox only)
+# POST /voices/blend (chatterbox + qwen3)
 # ---------------------------------------------------------------------------
 
 
@@ -289,7 +295,7 @@ async def clone_voice(
 async def blend_voices(
     name: str = Form(..., min_length=1, max_length=200),
     voice_a: str = Form(
-        ..., description="Voice ID for the first source (supplies rhythm)"
+        ..., description="Voice ID for the first source (supplies rhythm / ref_code)"
     ),
     voice_b: str = Form(..., description="Voice ID for the second source"),
     texture_mix: int = Form(
@@ -298,14 +304,53 @@ async def blend_voices(
         le=100,
         description="Texture blend: 0 = pure voice_a, 100 = pure voice_b",
     ),
+    model: str = Form(
+        "chatterbox",
+        description="Which engine to blend for: 'chatterbox' or 'qwen3'",
+    ),
 ) -> VoiceCreateResponse:
     manager: ModelManager = app.state.manager
     voice_store: VoiceStore = app.state.voice_store
 
     for vid, label in [(voice_a, "voice_a"), (voice_b, "voice_b")]:
-        if voice_store.get_voice(vid) is None:
+        meta = voice_store.get_voice(vid)
+        if meta is None:
             raise HTTPException(404, detail=f"{label} not found: {vid}")
+        if model not in meta.compatible_models:
+            raise HTTPException(
+                400,
+                detail=f"{label} '{vid}' is not compatible with model '{model}'. "
+                f"Compatible models: {meta.compatible_models}",
+            )
 
+    blend_config = {"voice_a": voice_a, "voice_b": voice_b, "texture_mix": texture_mix}
+
+    if model == "qwen3":
+        # Qwen3 blending is pure tensor math — no model load required.
+        pkl_a = voice_store.get_qwen3_prompt_path(voice_a)
+        pkl_b = voice_store.get_qwen3_prompt_path(voice_b)
+        if pkl_a is None or pkl_b is None:
+            missing = voice_a if pkl_a is None else voice_b
+            raise HTTPException(
+                422,
+                detail=f"Voice '{missing}' has no Qwen3 prompt cache. "
+                "Make one synthesis request with that voice first to build the cache.",
+            )
+        from app.engine_qwen3 import Qwen3Engine
+
+        alpha = texture_mix / 100.0
+        blended_item = Qwen3Engine.blend_voice_prompts(str(pkl_a), str(pkl_b), alpha)
+        try:
+            meta = voice_store.create_blended_qwen3_voice(
+                name=name,
+                prompt_item=blended_item,
+                blend_config=blend_config,
+            )
+        except FileExistsError as exc:
+            raise HTTPException(409, detail=f"Voice already exists: {exc}")
+        return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
+
+    # --- chatterbox blend ---
     path_a = str(voice_store.get_reference_path(voice_a))
     path_b = str(voice_store.get_reference_path(voice_b))
 
@@ -321,15 +366,89 @@ async def blend_voices(
         meta = voice_store.create_blended_voice(
             name=name,
             conditionals=blended,
-            blend_config={
-                "voice_a": voice_a,
-                "voice_b": voice_b,
-                "texture_mix": texture_mix,
-            },
+            blend_config=blend_config,
             sample_rate=engine.sample_rate,
         )
     except FileExistsError as exc:
         raise HTTPException(409, detail=f"Voice already exists: {exc}")
+
+    return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
+
+
+# ---------------------------------------------------------------------------
+# POST /voices/design  (qwen3 VoiceDesign → save as cloneable reference)
+# ---------------------------------------------------------------------------
+
+
+class VoiceDesignRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(
+        ...,
+        min_length=5,
+        max_length=500,
+        description="Natural language voice description, e.g. 'A warm, slightly husky male voice'",
+    )
+    language: str = Field("English", description="Language for the generated sample")
+    seed: int | None = Field(None, description="Fixed seed for reproducible voice identity")
+    sample_text: str = Field(
+        "The quick brown fox jumps over the lazy dog near a quiet river bank. "
+        "Bright yellow flowers bloom across the meadow.",
+        min_length=10,
+        max_length=500,
+        description="Text synthesised to produce the reference clip (stored as reference_text)",
+    )
+
+
+@app.post("/voices/design", response_model=VoiceCreateResponse, status_code=201)
+async def design_voice(req: VoiceDesignRequest) -> VoiceCreateResponse:
+    """Generate a novel voice from a text description, save it, and register it as a
+    cloneable Qwen3 voice.
+
+    Requires the server to be running with a VoiceDesign or Base variant model.
+    The generated WAV is saved as the voice reference; re-run /voices/design with the
+    same description + seed to reproduce an acoustically similar voice.
+    """
+    import io as _io
+
+    import soundfile as _sf
+
+    manager: ModelManager = app.state.manager
+    voice_store: VoiceStore = app.state.voice_store
+
+    if "qwen3" not in manager.available_models():
+        raise HTTPException(400, detail="Qwen3 model is not available")
+
+    params: dict = {"qwen3_language": req.language}
+    if req.seed is not None:
+        params["seed"] = req.seed
+
+    async with app.state.lock:
+        engine = await manager.ensure_loaded("qwen3")
+        audio, sr = await engine.generate(
+            text=req.sample_text,
+            voice_ref_path=None,
+            voice_ref_text=None,
+            speaker_description=req.description,
+            **params,
+        )
+
+    # Encode to WAV bytes
+    buf = _io.BytesIO()
+    _sf.write(buf, audio, sr, format="WAV", subtype="PCM_16")
+    wav_bytes = buf.getvalue()
+
+    try:
+        meta = voice_store.create_voice(
+            name=req.name,
+            audio_bytes=wav_bytes,
+            original_filename="designed.wav",
+            reference_text=req.sample_text,
+            target_model="qwen3",
+        )
+    except FileExistsError as exc:
+        raise HTTPException(409, detail=f"Voice already exists: {exc}")
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc))
 
     return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
 

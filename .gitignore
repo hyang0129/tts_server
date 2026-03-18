@@ -20,6 +20,9 @@ env/
 # Test artifacts (generated audio + reports)
 tests/artifacts/
 
+# Ad-hoc / exploratory audio samples (temp generations kept in-repo but not tracked)
+tests/samples/
+
 # Runtime voice data (cloned/blended by users, not source)
 voices/
 

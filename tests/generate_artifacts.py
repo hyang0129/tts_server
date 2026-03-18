@@ -7,11 +7,13 @@ Usage:
     python tests/generate_artifacts.py [--base-url http://localhost:8000] [--model both] [--dry-run] [--validate]
 
 Artifact plan:
-    Chatterbox: 6 texts x 2 clone voices (kronii_cb, nimi_cb) = 12 WAVs
-    Higgs:      6 texts x 2 description voices (default_male, default_female) = 12 WAVs
-    Qwen3:      5 texts x 2 description voices (qwen3_warm, qwen3_neutral) = 10 WAVs
-                (long fixture excluded from STT threshold — known edge case with proper nouns)
-    Total:      34 WAVs
+    Chatterbox:   6 texts x 2 clone voices (kronii_cb, nimi_cb) = 12 WAVs
+    Higgs:        6 texts x 2 description voices (default_male, default_female) = 12 WAVs
+    Qwen3:        5 texts x 2 preset speakers (qwen3_ryan, qwen3_serena) = 10 WAVs
+                  Requires QWEN3_MODEL_ID=...CustomVoice on server.
+    Qwen3 (Base): 4 texts x 3 clone voices (kronii-q3, nimi-q3, kronimi) = 12 WAVs
+                  Requires QWEN3_MODEL_ID=...Base on server; long+ten_second fixtures excluded.
+    Total:        46 WAVs (or 34 without qwen3_base)
 """
 
 from __future__ import annotations
@@ -68,6 +70,13 @@ QWEN3_VOICES = {
     "qwen3_serena": "Serena",
 }
 QWEN3_SKIP_LABELS = {"long"}
+
+# Qwen3 Base voice-clone voices: must already exist in the voice store.
+# Requires QWEN3_MODEL_ID=Qwen/Qwen3-TTS-12Hz-1.7B-Base on the server.
+# Clone voices are registered via /voices/clone or /voices/blend; the voice_id is used directly.
+QWEN3_BASE_CLONE_VOICES = ["kronii-q3", "nimi-q3", "kronimi"]
+# ten_second excluded: [chuckle] is a Chatterbox-only paralinguistic tag; Qwen3 speaks it literally.
+QWEN3_BASE_SKIP_LABELS = {"long", "ten_second"}
 
 # ---------------------------------------------------------------------------
 # Text samples -- 6 per voice, diverse content
@@ -263,9 +272,9 @@ def synthesize(
         return None
 
 
-def artifact_filename(text_label: str, voice_name: str) -> str:
-    """Build the WAV filename for a (text, voice) pair."""
-    return f"{text_label}_{voice_name}.wav"
+def artifact_filename(text_label: str, voice_name: str, model: str) -> str:
+    """Build the WAV path for a (text, voice) pair, under a per-model subdir."""
+    return f"{model}/{text_label}_{voice_name}.wav"
 
 
 def load_manifest() -> dict:
@@ -282,17 +291,22 @@ def build_plan(model_filter: str) -> list[tuple[str, str, str, str]]:
     for text_label, text_info in TEXTS.items():
         if model_filter in ("chatterbox", "both"):
             for voice_name in CHATTERBOX_VOICES:
-                fname = artifact_filename(text_label, voice_name)
+                fname = artifact_filename(text_label, voice_name, "chatterbox")
                 plan.append((fname, text_info["text"], voice_name, "chatterbox"))
         if model_filter in ("higgs", "both"):
             for voice_name in HIGGS_VOICES:
-                fname = artifact_filename(text_label, voice_name)
+                fname = artifact_filename(text_label, voice_name, "higgs")
                 plan.append((fname, text_info["text"], voice_name, "higgs"))
         if model_filter in ("qwen3", "both"):
             if text_label not in QWEN3_SKIP_LABELS:
                 for voice_name in QWEN3_VOICES:
-                    fname = artifact_filename(text_label, voice_name)
+                    fname = artifact_filename(text_label, voice_name, "qwen3")
                     plan.append((fname, text_info["text"], voice_name, "qwen3"))
+        if model_filter in ("qwen3_base",):
+            if text_label not in QWEN3_BASE_SKIP_LABELS:
+                for voice_name in QWEN3_BASE_CLONE_VOICES:
+                    fname = artifact_filename(text_label, voice_name, "qwen3_base")
+                    plan.append((fname, text_info["text"], voice_name, "qwen3_base"))
     return plan
 
 
@@ -308,6 +322,8 @@ def run(
     validate: bool = False,
 ) -> None:
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    for subdir in ("chatterbox", "higgs", "qwen3", "qwen3_base"):
+        (ARTIFACTS_DIR / subdir).mkdir(exist_ok=True)
 
     plan = build_plan(model_filter)
 
@@ -375,8 +391,10 @@ def run(
         elif model == "qwen3":
             speaker = QWEN3_VOICES.get(voice_name)
             wav_bytes = synthesize(
-                base_url, text, model=model, qwen3_speaker=speaker
+                base_url, text, model="qwen3", qwen3_speaker=speaker
             )
+        elif model == "qwen3_base":
+            wav_bytes = synthesize(base_url, text, model="qwen3", voice_id=voice_name)
         else:
             print("SKIPPED (unknown model)")
             failed.append(fname)
@@ -529,9 +547,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        choices=["chatterbox", "higgs", "qwen3", "both"],
+        choices=["chatterbox", "higgs", "qwen3", "qwen3_base", "both"],
         default="both",
-        help="Which model(s) to generate for (default: both)",
+        help=(
+            "Which model(s) to generate for (default: both). "
+            "qwen3=CustomVoice preset speakers; "
+            "qwen3_base=Base voice-clone artifacts (kronii-q3, nimi-q3, kronimi)"
+        ),
     )
     parser.add_argument(
         "--dry-run",
