@@ -169,73 +169,73 @@
       "text_label": "expressive"
     },
     {
-      "filename": "short_qwen3_warm.wav",
+      "filename": "short_qwen3_ryan.wav",
       "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
       "model": "qwen3",
-      "voice": "qwen3_warm",
+      "voice": "qwen3_ryan",
       "text_label": "short"
     },
     {
-      "filename": "short_qwen3_neutral.wav",
+      "filename": "short_qwen3_serena.wav",
       "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
       "model": "qwen3",
-      "voice": "qwen3_neutral",
+      "voice": "qwen3_serena",
       "text_label": "short"
     },
     {
-      "filename": "medium_qwen3_warm.wav",
+      "filename": "medium_qwen3_ryan.wav",
       "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
       "model": "qwen3",
-      "voice": "qwen3_warm",
+      "voice": "qwen3_ryan",
       "text_label": "medium"
     },
     {
-      "filename": "medium_qwen3_neutral.wav",
+      "filename": "medium_qwen3_serena.wav",
       "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
       "model": "qwen3",
-      "voice": "qwen3_neutral",
+      "voice": "qwen3_serena",
       "text_label": "medium"
     },
     {
-      "filename": "ten_second_qwen3_warm.wav",
+      "filename": "ten_second_qwen3_ryan.wav",
       "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
       "model": "qwen3",
-      "voice": "qwen3_warm",
+      "voice": "qwen3_ryan",
       "text_label": "ten_second"
     },
     {
-      "filename": "ten_second_qwen3_neutral.wav",
+      "filename": "ten_second_qwen3_serena.wav",
       "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
       "model": "qwen3",
-      "voice": "qwen3_neutral",
+      "voice": "qwen3_serena",
       "text_label": "ten_second"
     },
     {
-      "filename": "numbers_qwen3_warm.wav",
+      "filename": "numbers_qwen3_ryan.wav",
       "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
       "model": "qwen3",
-      "voice": "qwen3_warm",
+      "voice": "qwen3_ryan",
       "text_label": "numbers"
     },
     {
-      "filename": "numbers_qwen3_neutral.wav",
+      "filename": "numbers_qwen3_serena.wav",
       "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
       "model": "qwen3",
-      "voice": "qwen3_neutral",
+      "voice": "qwen3_serena",
       "text_label": "numbers"
     },
     {
-      "filename": "expressive_qwen3_warm.wav",
+      "filename": "expressive_qwen3_ryan.wav",
       "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
       "model": "qwen3",
-      "voice": "qwen3_warm",
+      "voice": "qwen3_ryan",
       "text_label": "expressive"
     },
     {
-      "filename": "expressive_qwen3_neutral.wav",
+      "filename": "expressive_qwen3_serena.wav",
       "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
       "model": "qwen3",
-      "voice": "qwen3_neutral",
+      "voice": "qwen3_serena",
       "text_label": "expressive"
     }
   ]

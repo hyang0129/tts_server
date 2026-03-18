@@ -131,11 +131,24 @@ The cloned voice will appear with `"compatible_models": ["chatterbox", "higgs", 
 
 ---
 
-## VRAM Profiles
+## VRAM and Performance Profiles
 
-| Model | Estimated VRAM | Notes |
-|-------|---------------|-------|
-| `Qwen3-TTS-12Hz-1.7B-*` | ~5.5 GB | Default. bfloat16. |
-| `Qwen3-TTS-12Hz-0.6B-*` | ~2.5 GB | Lightweight. Same API. |
+| Model | Measured VRAM | Generation speed | Notes |
+|-------|--------------|-----------------|-------|
+| `Qwen3-TTS-12Hz-1.7B-Base` | ~10 GB (incl. audio tokenizer) | 3–10 min / 5s audio | Voice cloning; audio tokenizer adds overhead |
+| `Qwen3-TTS-12Hz-1.7B-CustomVoice` | ~5.5 GB | ~2 min / 5s audio | Preset speakers; much faster, no tokenizer overhead |
+| `Qwen3-TTS-12Hz-1.7B-VoiceDesign` | ~5.5 GB | ~2 min / 5s audio | Description-based; similar to CustomVoice speed |
+| `Qwen3-TTS-12Hz-0.6B-*` | ~2.5 GB | Faster | Lightweight variants; same API |
 
-Override with `QWEN3_VRAM_MB` if measured values differ.
+**Recommended for production**: `CustomVoice` or `VoiceDesign` variants. The Base (cloning) model's audio tokenizer loads ~4–5 GB of additional VRAM and encodes reference audio on every call, making it 3–10× slower.
+
+Override the VRAM budget with `QWEN3_VRAM_MB` if measured values differ.
+
+## Artifact Generation
+
+The test artifact script (`tests/generate_artifacts.py`) uses the **CustomVoice** model with two preset speakers (`Ryan`, `Serena`). Start the server with:
+
+```bash
+QWEN3_MODEL_ID=Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice uvicorn app.main:app --host 0.0.0.0 --port 8000
+python tests/generate_artifacts.py --model qwen3
+```

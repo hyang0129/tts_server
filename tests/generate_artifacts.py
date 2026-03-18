@@ -60,11 +60,12 @@ HIGGS_VOICES = {
     ),
 }
 
-# Qwen3 voices: instruct-based via VoiceDesign / Base model.
+# Qwen3 voices: preset speakers via CustomVoice model (no reference audio needed).
+# Set QWEN3_MODEL_ID=Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice on the server.
 # long fixture is excluded (known STT edge case with military proper nouns).
 QWEN3_VOICES = {
-    "qwen3_warm": "A warm, clear female voice with calm narration style",
-    "qwen3_neutral": "A neutral male voice with clear enunciation and moderate pace",
+    "qwen3_ryan": "Ryan",
+    "qwen3_serena": "Serena",
 }
 QWEN3_SKIP_LABELS = {"long"}
 
@@ -224,6 +225,7 @@ def synthesize(
     model: str,
     voice_id: str | None = None,
     speaker_description: str | None = None,
+    qwen3_speaker: str | None = None,
 ) -> bytes | None:
     """Call the /tts endpoint. Returns WAV bytes on success.
 
@@ -237,6 +239,8 @@ def synthesize(
         payload["voice"] = voice_id
     if speaker_description is not None:
         payload["speaker_description"] = speaker_description
+    if qwen3_speaker is not None:
+        payload["qwen3_speaker"] = qwen3_speaker
 
     body = json.dumps(payload).encode()
     req = urllib.request.Request(
@@ -343,6 +347,10 @@ def run(
     for vname in HIGGS_VOICES:
         voice_ids[vname] = vname
 
+    # Qwen3 uses preset speakers (CustomVoice model) — no cloning needed.
+    for vname in QWEN3_VOICES:
+        voice_ids[vname] = vname
+
     # Synthesize
     generated: list[str] = []
     failed: list[str] = []
@@ -365,9 +373,9 @@ def run(
                 base_url, text, model=model, speaker_description=desc
             )
         elif model == "qwen3":
-            desc = QWEN3_VOICES[voice_name]
+            speaker = QWEN3_VOICES.get(voice_name)
             wav_bytes = synthesize(
-                base_url, text, model=model, speaker_description=desc
+                base_url, text, model=model, qwen3_speaker=speaker
             )
         else:
             print("SKIPPED (unknown model)")
