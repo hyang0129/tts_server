@@ -14,6 +14,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator
 
 from app.engine_chatterbox import ChatterboxEngine
+from app.engine_chatterbox_full import ChatterboxFullEngine
 from app.engine_higgs import HiggsEngine
 from app.engine_qwen3 import Qwen3Engine
 from app.model_manager import ModelManager
@@ -36,6 +37,7 @@ AVAILABLE_VRAM_MB = int(os.environ.get("AVAILABLE_VRAM_MB", "12000"))
 async def lifespan(app: FastAPI):
     manager = ModelManager(available_vram_mb=AVAILABLE_VRAM_MB)
     manager.register_engine(ChatterboxEngine())
+    manager.register_engine(ChatterboxFullEngine())
     manager.register_engine(HiggsEngine())
     manager.register_engine(Qwen3Engine())
 
@@ -78,6 +80,10 @@ class TTSRequest(BaseModel):
     top_k: int | None = None
     # Chatterbox-specific
     repetition_penalty: float | None = None
+    # Chatterbox Full-specific (also accepted by chatterbox for forward-compat)
+    exaggeration: float | None = None
+    cfg_weight: float | None = None
+    min_p: float | None = None
     # Higgs-specific
     seed: int | None = None
     max_new_tokens: int | None = None
@@ -169,6 +175,8 @@ async def synthesize(req: TTSRequest) -> Response:
                 conditionals_path = str(cond_path)
             else:
                 voice_ref_path = str(voice_store.get_reference_path(req.voice))
+        elif model_name == "chatterbox_full":
+            voice_ref_path = str(voice_store.get_reference_path(req.voice))
         elif model_name == "qwen3":
             # Blended qwen3 voices have no reference.wav — their identity lives entirely
             # in qwen3_prompt.pkl.  We still pass the expected reference.wav path so the
@@ -193,6 +201,15 @@ async def synthesize(req: TTSRequest) -> Response:
             params["repetition_penalty"] = req.repetition_penalty
         if conditionals_path is not None:
             params["conditionals_path"] = conditionals_path
+    elif model_name == "chatterbox_full":
+        if req.repetition_penalty is not None:
+            params["repetition_penalty"] = req.repetition_penalty
+        if req.exaggeration is not None:
+            params["exaggeration"] = req.exaggeration
+        if req.cfg_weight is not None:
+            params["cfg_weight"] = req.cfg_weight
+        if req.min_p is not None:
+            params["min_p"] = req.min_p
     elif model_name == "higgs":
         if req.seed is not None:
             params["seed"] = req.seed
@@ -306,7 +323,7 @@ async def blend_voices(
     ),
     model: str = Form(
         "chatterbox",
-        description="Which engine to blend for: 'chatterbox' or 'qwen3'",
+        description="Which engine to blend for: 'chatterbox', 'chatterbox_full', or 'qwen3'",
     ),
 ) -> VoiceCreateResponse:
     manager: ModelManager = app.state.manager
@@ -345,6 +362,27 @@ async def blend_voices(
                 name=name,
                 prompt_item=blended_item,
                 blend_config=blend_config,
+            )
+        except FileExistsError as exc:
+            raise HTTPException(409, detail=f"Voice already exists: {exc}")
+        return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
+
+    if model == "chatterbox_full":
+        # --- chatterbox_full blend ---
+        path_a = str(voice_store.get_reference_path(voice_a))
+        path_b = str(voice_store.get_reference_path(voice_b))
+        async with app.state.lock:
+            engine = await manager.ensure_loaded("chatterbox_full")
+            if not isinstance(engine, ChatterboxFullEngine):
+                raise HTTPException(500, detail="Blend requires chatterbox_full engine")
+            blended = await engine.blend_voices(path_a, path_b, texture_mix)
+        try:
+            meta = voice_store.create_blended_voice(
+                name=name,
+                conditionals=blended,
+                blend_config=blend_config,
+                sample_rate=engine.sample_rate,
+                compatible_model="chatterbox_full",
             )
         except FileExistsError as exc:
             raise HTTPException(409, detail=f"Voice already exists: {exc}")

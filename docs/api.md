@@ -13,12 +13,22 @@ Synthesize speech from text. The `model` field selects which TTS engine; the ser
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `text` | string (required) | -- | Text to synthesize (1–5000 chars, non-whitespace). Supports paralinguistic tags — see model docs. |
-| `model` | string | `"chatterbox"` | Engine: `"chatterbox"`, `"higgs"`, or `"qwen3"` |
+| `model` | string | `"chatterbox"` | Engine: `"chatterbox"`, `"chatterbox_full"`, `"higgs"`, or `"qwen3"` |
 | `voice` | string \| null | `null` | Voice ID. Must be compatible with the selected model. |
 | `temperature` | float | model default | Sampling temperature (0.0–2.0). Higher = more expressive/variable. |
 | `top_p` | float | 0.95 | Nucleus sampling threshold |
 
 For model-specific parameters see [chatterbox.md](chatterbox.md), [higgs.md](higgs.md), and [qwen3.md](qwen3.md).
+
+**Chatterbox Full-specific parameters** (ignored by other models):
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `exaggeration` | float | model default | Emotion intensity (0.0–1.0). Higher values increase expressiveness. |
+| `cfg_weight` | float | 0.5 | Classifier-free guidance weight. |
+| `min_p` | float | 0.05 | Minimum probability threshold for sampling. |
+
+Note: `top_k` is **not supported** by `chatterbox_full` and will be ignored if provided.
 
 **Qwen3-specific parameters** (ignored by other models):
 
@@ -78,8 +88,8 @@ Clone a voice from reference audio.
 ```
 
 **Voice compatibility rules**:
-- `reference_text` provided → compatible with `higgs`, `qwen3`, and `chatterbox`
-- `reference_text` omitted → compatible with `chatterbox` only
+- `reference_text` provided → compatible with `higgs`, `qwen3`, `chatterbox`, and `chatterbox_full`
+- `reference_text` omitted → compatible with `chatterbox` and `chatterbox_full`
 
 **Status codes**: 201 created, 409 voice already exists, 422 validation error.
 
@@ -87,7 +97,7 @@ Clone a voice from reference audio.
 
 ### POST /voices/blend
 
-Blend two existing voices into a new voice. **Chatterbox only.**
+Blend two existing voices into a new voice. **Chatterbox (`chatterbox` and `chatterbox_full`) only.**
 
 **Request** (multipart/form-data):
 
@@ -97,6 +107,7 @@ Blend two existing voices into a new voice. **Chatterbox only.**
 | `voice_a` | string (required) | -- | First voice ID (contributes rhythm/prosody) |
 | `voice_b` | string (required) | -- | Second voice ID |
 | `texture_mix` | int | 50 | Texture blend: 0 = pure voice_a, 100 = pure voice_b |
+| `model` | string | `"chatterbox"` | Which Chatterbox variant to use: `"chatterbox"` or `"chatterbox_full"` |
 
 **Response** (201 Created):
 ```json
@@ -107,7 +118,7 @@ Blend two existing voices into a new voice. **Chatterbox only.**
 }
 ```
 
-Blended voices are Chatterbox-only. The blend interpolates speaker identity embeddings while keeping rhythm/prosody from `voice_a`.
+Blended voices are Chatterbox-only (`chatterbox` and `chatterbox_full`). The blend interpolates speaker identity embeddings while keeping rhythm/prosody from `voice_a`.
 
 **Status codes**: 201 created, 404 source voice not found, 409 already exists.
 
@@ -171,9 +182,10 @@ Server health and engine status.
   "status": "ok",
   "active_model": "chatterbox",
   "engines": {
-    "chatterbox": { "loaded": true,  "estimated_vram_mb": 4700, "sample_rate": 24000 },
-    "higgs":       { "loaded": false, "estimated_vram_mb": 9000, "sample_rate": 24000 },
-    "qwen3":       { "loaded": false, "estimated_vram_mb": 5500, "sample_rate": 24000 }
+    "chatterbox":      { "loaded": true,  "estimated_vram_mb": 4700, "sample_rate": 24000 },
+    "chatterbox_full": { "loaded": false, "estimated_vram_mb": 4700, "sample_rate": 24000 },
+    "higgs":           { "loaded": false, "estimated_vram_mb": 9000, "sample_rate": 24000 },
+    "qwen3":           { "loaded": false, "estimated_vram_mb": 5500, "sample_rate": 24000 }
   },
   "available_vram_mb": 10000,
   "voices": 3
@@ -189,9 +201,10 @@ List available models with load status.
 **Response** (200):
 ```json
 [
-  { "name": "chatterbox", "available": true, "loaded": true,  "active": true,  "estimated_vram_mb": 4700, "sample_rate": 24000 },
-  { "name": "higgs",      "available": true, "loaded": false, "active": false, "estimated_vram_mb": 9000, "sample_rate": 24000 },
-  { "name": "qwen3",      "available": true, "loaded": false, "active": false, "estimated_vram_mb": 5500, "sample_rate": 24000 }
+  { "name": "chatterbox",      "available": true, "loaded": true,  "active": true,  "estimated_vram_mb": 4700, "sample_rate": 24000 },
+  { "name": "chatterbox_full", "available": true, "loaded": false, "active": false, "estimated_vram_mb": 4700, "sample_rate": 24000 },
+  { "name": "higgs",           "available": true, "loaded": false, "active": false, "estimated_vram_mb": 9000, "sample_rate": 24000 },
+  { "name": "qwen3",           "available": true, "loaded": false, "active": false, "estimated_vram_mb": 5500, "sample_rate": 24000 }
 ]
 ```
 
@@ -202,20 +215,22 @@ List available models with load status.
 - **Lazy loading**: No model is loaded at startup; loading happens on first request.
 - **One-at-a-time**: Requesting a different model triggers unload of the current engine, then load of the new one.
 - **Idle auto-unload**: After 60s with no requests the active engine is unloaded to free VRAM.
-- **Swap time**: Chatterbox ~3s, Higgs 8-bit ~12s, Higgs 4-bit ~21s, Qwen3 1.7B ~8s (estimated).
+- **Swap time**: Chatterbox ~3s, Chatterbox Full ~3s (estimated), Higgs 8-bit ~12s, Higgs 4-bit ~21s, Qwen3 1.7B ~8s (estimated).
 
 ## Voice Compatibility Matrix
 
-| Feature | Chatterbox | Higgs | Qwen3 |
-|---|---|---|---|
-| Reference audio only | Yes | No | No |
-| Reference audio + transcript | Yes | Yes (required) | Yes (Base model) |
-| Pre-computed conditionals | Yes | No | No |
-| Voice blending | Yes | No | No |
-| Description-only (no voice) | No | Yes | Yes (VoiceDesign/instruct) |
-| Preset speakers | No | No | Yes (CustomVoice model) |
-| Tone/emotion instruct | No | No | Yes |
-| Sample rate | 24 kHz | 24 kHz | 24 kHz |
+| Feature | Chatterbox | Chatterbox Full | Higgs | Qwen3 |
+|---|---|---|---|---|
+| Reference audio only | Yes | Yes | No | No |
+| Reference audio + transcript | Yes | Yes | Yes (required) | Yes (Base model) |
+| Pre-computed conditionals | Yes | No | No | No |
+| Voice blending | Yes | Yes | No | No |
+| Description-only (no voice) | No | No | Yes | Yes (VoiceDesign/instruct) |
+| Preset speakers | No | No | No | Yes (CustomVoice model) |
+| Tone/emotion instruct | No | No | No | Yes |
+| Emotion intensity (`exaggeration`) | No | Yes | No | No |
+| `top_k` sampling | Yes | No | No | No |
+| Sample rate | 24 kHz | 24 kHz | 24 kHz | 24 kHz |
 
 ## .env Configuration Reference
 
@@ -227,6 +242,7 @@ List available models with load status.
 | `HIGGS_REPO_PATH` | `/tmp/faster-higgs-audio` | Path to faster-higgs-audio source repo |
 | `HIGGS_MODEL_ID` | `bosonai/higgs-audio-v2-generation-3B-base` | HuggingFace model ID |
 | `HIGGS_TOKENIZER_ID` | `bosonai/higgs-audio-v2-tokenizer` | HuggingFace tokenizer ID |
+| `CB_FULL_VRAM_MB` | `4700` | Override VRAM budget estimate for chatterbox_full |
 | `QWEN3_MODEL_ID` | `Qwen/Qwen3-TTS-12Hz-1.7B-Base` | Qwen3-TTS HuggingFace model ID. Variants: `Base` (cloning), `CustomVoice` (preset speakers), `VoiceDesign` (description). 0.6B variants also available. |
 | `QWEN3_DTYPE` | `bfloat16` | Qwen3 weight dtype: `bfloat16` or `float16` |
 | `QWEN3_VRAM_MB` | `5500` | Override Qwen3 VRAM budget estimate |

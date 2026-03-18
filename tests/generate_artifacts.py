@@ -7,13 +7,14 @@ Usage:
     python tests/generate_artifacts.py [--base-url http://localhost:8000] [--model both] [--dry-run] [--validate]
 
 Artifact plan:
-    Chatterbox:   6 texts x 2 clone voices (kronii_cb, nimi_cb) = 12 WAVs
-    Higgs:        6 texts x 2 description voices (default_male, default_female) = 12 WAVs
-    Qwen3:        5 texts x 2 preset speakers (qwen3_ryan, qwen3_serena) = 10 WAVs
-                  Requires QWEN3_MODEL_ID=...CustomVoice on server.
-    Qwen3 (Base): 4 texts x 3 clone voices (kronii-q3, nimi-q3, kronimi) = 12 WAVs
-                  Requires QWEN3_MODEL_ID=...Base on server; long+ten_second fixtures excluded.
-    Total:        46 WAVs (or 34 without qwen3_base)
+    Chatterbox:      6 texts x 2 clone voices (kronii_cb, nimi_cb) = 12 WAVs
+    Chatterbox Full: 6 texts x 2 clone voices (kronii_cbfull, nimi_cbfull) = 12 WAVs
+    Higgs:           6 texts x 2 description voices (default_male, default_female) = 12 WAVs
+    Qwen3:           5 texts x 2 preset speakers (qwen3_ryan, qwen3_serena) = 10 WAVs
+                     Requires QWEN3_MODEL_ID=...CustomVoice on server.
+    Qwen3 (Base):    4 texts x 3 clone voices (kronii-q3, nimi-q3, kronimi) = 12 WAVs
+                     Requires QWEN3_MODEL_ID=...Base on server; long+ten_second fixtures excluded.
+    Total:           58 WAVs (or 46 without qwen3_base)
 """
 
 from __future__ import annotations
@@ -49,6 +50,20 @@ CHATTERBOX_VOICES = {
         "reference_text": "This is a sample of my voice for cloning purposes.",
     },
 }
+
+# Chatterbox Full voices: same reference audio as Chatterbox Turbo
+CHATTERBOX_FULL_VOICES = {
+    "kronii_cbfull": {
+        "audio_path": FIXTURES_DIR / "kroniivoice_15s.wav",
+        "reference_text": "This is a sample of my voice for cloning purposes.",
+    },
+    "nimi_cbfull": {
+        "audio_path": FIXTURES_DIR / "nimivoice_15s.wav",
+        "reference_text": "This is a sample of my voice for cloning purposes.",
+    },
+}
+
+CHATTERBOX_FULL_SKIP_LABELS: set[str] = set()
 
 # Higgs voices: description-only (skip cloning -- unreliable)
 HIGGS_VOICES = {
@@ -307,6 +322,11 @@ def build_plan(model_filter: str) -> list[tuple[str, str, str, str]]:
                 for voice_name in QWEN3_BASE_CLONE_VOICES:
                     fname = artifact_filename(text_label, voice_name, "qwen3_base")
                     plan.append((fname, text_info["text"], voice_name, "qwen3_base"))
+        if model_filter in ("chatterbox_full", "both"):
+            if text_label not in CHATTERBOX_FULL_SKIP_LABELS:
+                for voice_name in CHATTERBOX_FULL_VOICES:
+                    fname = artifact_filename(text_label, voice_name, "chatterbox_full")
+                    plan.append((fname, text_info["text"], voice_name, "chatterbox_full"))
     return plan
 
 
@@ -322,7 +342,7 @@ def run(
     validate: bool = False,
 ) -> None:
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
-    for subdir in ("chatterbox", "higgs", "qwen3", "qwen3_base"):
+    for subdir in ("chatterbox", "chatterbox_full", "higgs", "qwen3", "qwen3_base"):
         (ARTIFACTS_DIR / subdir).mkdir(exist_ok=True)
 
     plan = build_plan(model_filter)
@@ -359,6 +379,19 @@ def run(
             if vid:
                 voice_ids[vname] = vid
 
+    if model_filter in ("chatterbox_full", "both"):
+        print("\n--- Cloning chatterbox_full voices ---")
+        for vname, vconfig in CHATTERBOX_FULL_VOICES.items():
+            audio_path = vconfig["audio_path"]
+            if not audio_path.exists():
+                print(f"  SKIP {vname}: file not found at {audio_path}")
+                continue
+            vid = clone_voice(
+                base_url, vname, audio_path, vconfig["reference_text"]
+            )
+            if vid:
+                voice_ids[vname] = vid
+
     # Higgs description voices don't need cloning
     for vname in HIGGS_VOICES:
         voice_ids[vname] = vname
@@ -376,7 +409,7 @@ def run(
         out_path = ARTIFACTS_DIR / fname
         print(f"  {fname} [{model}] ...", end=" ", flush=True)
 
-        if model == "chatterbox":
+        if model in ("chatterbox", "chatterbox_full"):
             vid = voice_ids.get(voice_name)
             if vid is None:
                 print("SKIPPED (voice not cloned)")
@@ -547,10 +580,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        choices=["chatterbox", "higgs", "qwen3", "qwen3_base", "both"],
+        choices=["chatterbox", "chatterbox_full", "higgs", "qwen3", "qwen3_base", "both"],
         default="both",
         help=(
             "Which model(s) to generate for (default: both). "
+            "chatterbox_full=original Chatterbox model (exaggeration/cfg_weight/min_p params); "
             "qwen3=CustomVoice preset speakers; "
             "qwen3_base=Base voice-clone artifacts (kronii-q3, nimi-q3, kronimi)"
         ),

@@ -210,6 +210,73 @@ class TestChatterbox:
 
 
 # ---------------------------------------------------------------------------
+# Chatterbox Full tests
+# ---------------------------------------------------------------------------
+
+
+class TestChatterboxFull:
+    @pytest.fixture(scope="class")
+    def voice_id(self):
+        """Clone kronii voice for chatterbox_full tests."""
+        audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
+        if not audio_path.exists():
+            pytest.skip("kroniivoice_15s.wav fixture not found")
+        return clone_voice(
+            "test_kronii_cbfull",
+            audio_path,
+            "This is a sample of my voice for cloning purposes.",
+        )
+
+    def test_chatterbox_full_clone_and_generate(self, voice_id):
+        """Clone a voice and generate TTS with chatterbox_full model."""
+        wav_bytes = post_tts({
+            "text": "Did you know? The hamburger was not actually invented in Hamburg.",
+            "model": "chatterbox_full",
+            "voice": voice_id,
+        })
+        # WAV files start with RIFF header
+        assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
+        assert len(wav_bytes) > 1000, "WAV file suspiciously small"
+
+    def test_chatterbox_full_exaggeration_param(self, voice_id):
+        """Generate TTS with chatterbox_full model using exaggeration param."""
+        wav_bytes = post_tts({
+            "text": "Did you know? The hamburger was not actually invented in Hamburg.",
+            "model": "chatterbox_full",
+            "voice": voice_id,
+            "exaggeration": 0.8,
+        })
+        assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
+
+    def test_chatterbox_full_stt_validation(self, voice_id):
+        """Generate chatterbox_full TTS and validate transcription quality."""
+        expected_text = "Did you know? The hamburger was not actually invented in Hamburg."
+        wav_bytes = post_tts({
+            "text": expected_text,
+            "model": "chatterbox_full",
+            "voice": voice_id,
+        })
+        assert wav_bytes[:4] == b"RIFF"
+
+        # Write to temp file for STT validation
+        tmp_path = FIXTURES_DIR.parent / "artifacts" / "_test_cbfull_stt.wav"
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path.write_bytes(wav_bytes)
+
+        try:
+            from tests.stt_validate import validate_file
+            result = validate_file(str(tmp_path), expected_text, use_llm=False)
+            assert result["word_match_pct"] >= 70.0, (
+                f"STT match too low: {result['word_match_pct']}% "
+                f"(transcription: {result['transcription']!r})"
+            )
+        except ImportError:
+            pytest.skip("stt_validate or faster-whisper not available")
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
 # Higgs tests
 # ---------------------------------------------------------------------------
 

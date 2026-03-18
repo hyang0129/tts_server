@@ -15,7 +15,7 @@ The **video_agent** repo handles script writing and episode orchestration. This 
 
 ## Features
 
-- **Multi-model**: Chatterbox (350M, fast), Higgs Audio (3B, expressive), and Qwen3-TTS (1.7B, multilingual) behind one API
+- **Multi-model**: Chatterbox Turbo (350M, fast), Chatterbox Full (original, expressive), Higgs Audio (3B, expressive), and Qwen3-TTS (1.7B, multilingual) behind one API
 - **Lazy loading**: Models load on first request, no VRAM used at idle
 - **Auto-unload**: Models unloaded after 60s idle to free VRAM
 - **VRAM-aware**: Only enables models that fit within configured VRAM budget
@@ -132,6 +132,7 @@ See [docs/api.md](docs/api.md) for full request/response schemas. Model-specific
 | Model | Loaded | Peak | Load Time |
 |-------|--------|------|-----------|
 | Chatterbox Turbo | 4.2 GB | 4.4 GB | ~3s |
+| Chatterbox Full | ~4.7 GB (estimated) | TBD | ~3s (estimated) |
 | Higgs 8-bit | 6.7 GB | 7.1 GB | ~12s |
 | Higgs 4-bit | 4.2 GB | 5.0 GB | ~21s |
 | Qwen3-TTS 1.7B (bf16) | ~5.5 GB | TBD | ~8s (estimated) |
