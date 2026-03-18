@@ -30,6 +30,14 @@ For model-specific parameters see [chatterbox.md](chatterbox.md), [higgs.md](hig
 
 Note: `top_k` is **not supported** by `chatterbox_full` and will be ignored if provided.
 
+**Chatterbox Full — paralinguistic tags:**
+
+The full model has a different (richer) tag vocabulary than Chatterbox Turbo. Tags are placed inline in the `text` field.
+
+Supported: `[laughter]`, `[giggle]`, `[guffaw]`, `[gasp]`, `[sigh]`, `[whisper]`, `[cough]`, `[sneeze]`, `[sniff]`, `[clear_throat]`, `[exhale]`, `[inhale]`, `[groan]`, `[cry]`, `[mumble]`, `[humming]`, `[singing]`, `[UH]`, `[UM]`
+
+For Turbo compatibility, `[laugh]` → `[laughter]`, `[chuckle]` → `[giggle]`, `[breath]` → `[inhale]` are automatically translated.
+
 **Qwen3-specific parameters** (ignored by other models):
 
 | Field | Type | Default | Description |

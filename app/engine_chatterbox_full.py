@@ -14,6 +14,22 @@ logger = logging.getLogger(__name__)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+# The full model uses a different (richer) paralinguistic tag vocabulary than Turbo.
+# Map Turbo-style tags to their closest Full-model equivalents so callers using
+# Turbo-style tags still get expressive audio instead of the tag being spoken literally.
+_TAG_COMPAT_MAP = {
+    "[laugh]": "[laughter]",
+    "[chuckle]": "[giggle]",
+    "[breath]": "[inhale]",
+}
+
+
+def _normalize_tags(text: str) -> str:
+    """Replace Turbo-style paralinguistic tags with Full-model equivalents."""
+    for turbo_tag, full_tag in _TAG_COMPAT_MAP.items():
+        text = text.replace(turbo_tag, full_tag)
+    return text
+
 
 class ChatterboxFullEngine(TTSEngine):
     name = "chatterbox_full"
@@ -71,6 +87,7 @@ class ChatterboxFullEngine(TTSEngine):
         cfg_weight = params.get("cfg_weight", 0.5)
         min_p = params.get("min_p", 0.05)
 
+        text = _normalize_tags(text)
         loop = asyncio.get_running_loop()
 
         def _run():
