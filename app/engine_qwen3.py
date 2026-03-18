@@ -291,14 +291,51 @@ class Qwen3Engine(TTSEngine):
                 estimated_frames = int(word_count / _WPS * _CODEC_HZ)
                 clone_kwargs["max_new_tokens"] = max(120, estimated_frames * 3)
 
+            _instruct = instruct
+
             def _run():
                 prompt_items = self._get_voice_clone_prompt(model, _ref_path, _ref_text)
-                wavs, sr = model.generate_voice_clone(
-                    text=text,
-                    language=language,
-                    voice_clone_prompt=prompt_items,
+                if not _instruct:
+                    wavs, sr = model.generate_voice_clone(
+                        text=text,
+                        language=language,
+                        voice_clone_prompt=prompt_items,
+                        non_streaming_mode=True,
+                        **clone_kwargs,
+                    )
+                    return wavs[0], sr
+                # instruct + voice clone: bypass the wrapper and call the core model
+                # directly so we can pass both voice_clone_prompt and instruct_ids.
+                prompt_dict = model._prompt_items_to_voice_clone_prompt(prompt_items)
+                ref_texts = [it.ref_text for it in prompt_items]
+                input_ids = model._tokenize_texts([model._build_assistant_text(text)])
+                ref_ids = [
+                    model._tokenize_texts([model._build_ref_text(rt)])[0]
+                    if rt else None
+                    for rt in ref_texts
+                ]
+                instruct_ids = [model._tokenize_texts([model._build_instruct_text(_instruct)])[0]]
+                gen_kw = model._merge_generate_kwargs(**clone_kwargs)
+                talker_codes, _ = model.model.generate(
+                    input_ids=input_ids,
+                    instruct_ids=instruct_ids,
+                    ref_ids=ref_ids,
+                    voice_clone_prompt=prompt_dict,
+                    languages=[language],
                     non_streaming_mode=True,
-                    **clone_kwargs,
+                    **gen_kw,
+                )
+                codes_for_decode = []
+                for i, codes in enumerate(talker_codes):
+                    ref_code_list = prompt_dict.get("ref_code")
+                    if ref_code_list is not None and ref_code_list[i] is not None:
+                        codes_for_decode.append(
+                            torch.cat([ref_code_list[i].to(codes.device), codes], dim=0)
+                        )
+                    else:
+                        codes_for_decode.append(codes)
+                wavs, sr = model.model.speech_tokenizer.decode(
+                    [{"audio_codes": c} for c in codes_for_decode]
                 )
                 return wavs[0], sr
 
