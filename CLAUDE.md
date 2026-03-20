@@ -37,6 +37,9 @@ set to the Base model — no override needed.
 # Run the server
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 
+# Install tracked voice fixtures (run once after fresh clone/container rebuild)
+python tests/setup_test_voices.py
+
 # Lint
 ruff check .
 
@@ -51,6 +54,32 @@ python tests/generate_artifacts.py
 # STT validation (also serves as model setup health check)
 python tests/stt_validate.py --artifacts-dir tests/artifacts/ --manifest tests/manifest.json -v
 ```
+
+## Voice fixtures
+
+Named voices required by integration tests are tracked in `tests/voice_fixtures/<voice_id>/`.
+The runtime `voices/` directory is gitignored. After a fresh clone or container rebuild, install
+the fixtures before running tests:
+
+```bash
+python tests/setup_test_voices.py
+```
+
+This copies fixture voices into the runtime `voices/` directory. The script is idempotent —
+already-installed voices are skipped.
+
+### Tracked fixture voices
+
+| Voice ID | Model | Description |
+|----------|-------|-------------|
+| `ragnar-narrator` | higgs | Young woman, warm conversational delivery, measured academic pace. Reference clip generated 2026-03-20 with Higgs 8-bit. Used by video_agent_long higgs integration tests for voice consistency. |
+
+### Adding a new fixture voice
+
+1. Generate the reference audio (keep under 30s): `POST /tts` or `POST /voices/clone`
+2. Copy files from `voices/<id>/` → `tests/voice_fixtures/<id>/`
+3. Commit the fixture directory (reference.wav, reference.txt, metadata.json)
+4. Document it in the table above
 
 ## Qwen3 Base voice cloning: reference text requirements
 
