@@ -16,16 +16,19 @@ Consolidated FastAPI TTS server that serves multiple model backends (Chatterbox,
 ## Starting the server (agent instructions)
 
 The agent can and should start the server autonomously when needed (e.g. before running
-generate_artifacts.py or integration tests). Use the `higgs_tts` venv — it contains all
-three engines (qwen_tts, chatterbox-tts, faster-higgs-audio deps) and fastapi/uvicorn.
+generate_artifacts.py or integration tests). Use the `tts_server` venv — it contains all
+engines (chatterbox-tts, faster-higgs-audio deps, qwen-tts) and fastapi/uvicorn.
 
 ```bash
 # Start in background (recommended — server takes ~5s to become ready)
-AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/higgs_tts/bin/uvicorn app.main:app \
+AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/uvicorn app.main:app \
     --host 0.0.0.0 --port 8000 > /tmp/tts_server.log 2>&1 &
 
 # Wait for ready
 curl --retry 10 --retry-delay 2 --retry-connrefused -s http://localhost:8000/health
+
+# Install voice fixtures (required for named-voice tests — run once per fresh container)
+python tests/setup_test_voices.py
 ```
 
 The `.env` file in the repo root is auto-loaded by the server; it contains `HF_TOKEN` and

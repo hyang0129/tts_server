@@ -157,6 +157,24 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 Models are lazy-loaded on first request. Startup is fast; the first `/tts` call will take 3–21 seconds while the model loads into VRAM.
 
+## 5.5 Install voice fixtures
+
+Voice fixtures are reference audio clips committed to `tests/voice_fixtures/` and required
+by integration tests in this repo and dependent repos (notably **video_agent_long**). They
+are not present in the runtime `voices/` directory on a fresh clone.
+
+```bash
+python tests/setup_test_voices.py
+```
+
+Run once after a fresh clone or container rebuild (before running any tests that use named voices).
+The script is idempotent — already-installed voices are skipped.
+
+**Cross-repo fixture dependency:** `video_agent_long` tests reference the `ragnar-narrator`
+voice (a Higgs reference clip cloned here). If you are running video_agent_long integration
+tests in a fresh container, this step is required even if you are not running tts_server tests
+directly. See [Cross-repo fixtures](#cross-repo-fixtures) at the bottom of this document.
+
 ---
 
 ## 6. Verifying the Setup
@@ -219,3 +237,28 @@ python tests/stt_validate.py \
 ```
 
 A correctly set-up server should pass at least 85% of test cases (21/24 on the reference hardware). Failures on specific proper nouns or brand names are normal model quality variance, not setup errors.
+
+---
+
+## Cross-repo fixtures
+
+Some fixtures in this repo are consumed by other repos:
+
+| Voice ID | Consumed by | Purpose |
+|----------|-------------|---------|
+| `ragnar-narrator` | `video_agent_long` integration tests | Higgs reference audio for consistent speaker identity across TTS blocks. voice_agent_long's `test_persona_higgs_integration.py` uses this voice ID. |
+
+**Why this coupling exists:** Higgs does not produce a consistent speaker identity from
+`speaker_description` alone — varying `scene_description` per block shifts the voice even
+with a constant description and seed=0. Voice cloning (reference audio anchor) is required
+for multi-block narration. The reference audio must be pre-cloned on the server before
+video_agent_long tests can run.
+
+**Setup order in a fresh container:**
+1. Start tts_server: `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+2. Install fixtures: `python tests/setup_test_voices.py`
+3. Run video_agent_long tests (or tts_server tests)
+
+**Adding a new cross-repo fixture voice:** commit the reference audio to
+`tests/voice_fixtures/<id>/`, document it in the table above, and update
+`video_agent_long/CLAUDE.md` with the prerequisite.
