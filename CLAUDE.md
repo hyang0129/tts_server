@@ -8,6 +8,7 @@ Consolidated FastAPI TTS server that serves multiple model backends (Chatterbox,
 - **app/model_manager.py** — ModelManager: lazy load/unload/swap engines, VRAM tracking, idle timer
 - **app/engine_base.py** — TTSEngine ABC
 - **app/engine_chatterbox.py** — Chatterbox Turbo wrapper
+- **app/engine_chatterbox_full.py** — Chatterbox Full (original) wrapper (same chatterbox package, ResembleAI/chatterbox model)
 - **app/engine_higgs.py** — Higgs Audio wrapper (requires faster-higgs-audio repo)
 - **app/engine_qwen3.py** — Qwen3-TTS wrapper (requires qwen-tts package)
 - **app/voices.py** — Unified VoiceStore with compatible_models tracking
@@ -76,7 +77,7 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 
 ## Hardware target
 - NVIDIA RTX 5070 Ti Laptop GPU (12 GB VRAM, Blackwell / sm_120)
-- Measured VRAM: Chatterbox ~4.2 GB, Higgs 8-bit ~6.7 GB, Higgs 4-bit ~4.2 GB
+- Measured VRAM: Chatterbox ~4.2 GB, Chatterbox Full ~4.7 GB (estimated), Higgs 8-bit ~6.7 GB, Higgs 4-bit ~4.2 GB
 - One model at a time; swap takes 3-21s depending on model
 - See `docs/vram_management.md` for full profiling data
 
@@ -87,6 +88,7 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 - `HIGGS_REPO_PATH` — path to faster-higgs-audio repo (default /tmp/faster-higgs-audio)
 - `HIGGS_MODEL_ID` — HuggingFace model ID for higgs
 - `HIGGS_TOKENIZER_ID` — HuggingFace tokenizer ID for higgs
+- `CB_FULL_VRAM_MB` — override VRAM budget estimate for chatterbox_full (default 4700)
 - `QWEN3_MODEL_ID` — HuggingFace model ID for qwen3 (default Qwen/Qwen3-TTS-12Hz-1.7B-Base)
 - `QWEN3_DTYPE` — weight dtype for qwen3 (bfloat16 or float16, default bfloat16)
 - `QWEN3_VRAM_MB` — override VRAM budget estimate for qwen3 (default 5500)

@@ -306,6 +306,11 @@ class Qwen3Engine(TTSEngine):
                     return wavs[0], sr
                 # instruct + voice clone: bypass the wrapper and call the core model
                 # directly so we can pass both voice_clone_prompt and instruct_ids.
+                # ICL mode is kept for generation (ref_code as prefix conditions the
+                # generated tokens on the reference voice). However we decode the
+                # generated codes directly without prepending ref_code — this avoids
+                # the silence gap that appears when the codec decoder sees the reference
+                # prefix and the subsequent trim calculation lands in a silence region.
                 prompt_dict = model._prompt_items_to_voice_clone_prompt(prompt_items)
                 ref_texts = [it.ref_text for it in prompt_items]
                 input_ids = model._tokenize_texts([model._build_assistant_text(text)])
@@ -325,17 +330,9 @@ class Qwen3Engine(TTSEngine):
                     non_streaming_mode=True,
                     **gen_kw,
                 )
-                codes_for_decode = []
-                for i, codes in enumerate(talker_codes):
-                    ref_code_list = prompt_dict.get("ref_code")
-                    if ref_code_list is not None and ref_code_list[i] is not None:
-                        codes_for_decode.append(
-                            torch.cat([ref_code_list[i].to(codes.device), codes], dim=0)
-                        )
-                    else:
-                        codes_for_decode.append(codes)
+                # Decode generated codes directly — no ref_code prepend, no trim.
                 wavs, sr = model.model.speech_tokenizer.decode(
-                    [{"audio_codes": c} for c in codes_for_decode]
+                    [{"audio_codes": c} for c in talker_codes]
                 )
                 return wavs[0], sr
 

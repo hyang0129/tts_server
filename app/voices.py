@@ -220,8 +220,9 @@ class VoiceStore:
             compatible.append("higgs")
             # Qwen3 Base model also requires a transcript for voice cloning.
             compatible.append("qwen3")
-        # Chatterbox can use any reference WAV (no transcript needed).
+        # Chatterbox and Chatterbox Full can use any reference WAV (no transcript needed).
         compatible.append("chatterbox")
+        compatible.append("chatterbox_full")
 
         # If a target_model was specified, ensure it's in the list.
         if target_model and target_model not in compatible:
@@ -249,6 +250,7 @@ class VoiceStore:
         conditionals: object,
         blend_config: dict,
         sample_rate: int,
+        compatible_model: str = "chatterbox",
     ) -> VoiceMetadata:
         voice_id = _slugify(name)
         if voice_id in self._index:
@@ -267,7 +269,7 @@ class VoiceStore:
             created_at=datetime.now(timezone.utc),
             duration_s=0.0,
             sample_rate=sample_rate,
-            compatible_models=["chatterbox"],
+            compatible_models=[compatible_model],
         )
         meta_path = voice_dir / "metadata.json"
         raw = json.loads(meta.model_dump_json())
