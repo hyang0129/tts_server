@@ -1,171 +1,325 @@
 {
   "artifacts": [
     {
-      "filename": "short_kronii_cb.wav",
+      "filename": "chatterbox/short_kronii_cb.wav",
       "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
       "model": "chatterbox",
       "voice": "kronii_cb",
       "text_label": "short"
     },
     {
-      "filename": "short_nimi_cb.wav",
+      "filename": "chatterbox/short_nimi_cb.wav",
       "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
       "model": "chatterbox",
       "voice": "nimi_cb",
       "text_label": "short"
     },
     {
-      "filename": "short_default_male.wav",
-      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
-      "model": "higgs",
-      "voice": "default_male",
-      "text_label": "short"
-    },
-    {
-      "filename": "short_default_female.wav",
-      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
-      "model": "higgs",
-      "voice": "default_female",
-      "text_label": "short"
-    },
-    {
-      "filename": "medium_kronii_cb.wav",
-      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
+      "filename": "chatterbox/medium_kronii_cb.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
       "model": "chatterbox",
       "voice": "kronii_cb",
       "text_label": "medium"
     },
     {
-      "filename": "medium_nimi_cb.wav",
-      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
+      "filename": "chatterbox/medium_nimi_cb.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
       "model": "chatterbox",
       "voice": "nimi_cb",
       "text_label": "medium"
     },
     {
-      "filename": "medium_default_male.wav",
-      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
-      "model": "higgs",
-      "voice": "default_male",
-      "text_label": "medium"
-    },
-    {
-      "filename": "medium_default_female.wav",
-      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis \u2014 before that, burgers were eaten with bread slices.",
-      "model": "higgs",
-      "voice": "default_female",
-      "text_label": "medium"
-    },
-    {
-      "filename": "long_kronii_cb.wav",
-      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger \u2014 regardless of its actual type \u2014 because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times \u2014 winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
+      "filename": "chatterbox/long_kronii_cb.wav",
+      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger — regardless of its actual type — because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times — winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
       "model": "chatterbox",
       "voice": "kronii_cb",
       "text_label": "long"
     },
     {
-      "filename": "long_nimi_cb.wav",
-      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger \u2014 regardless of its actual type \u2014 because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times \u2014 winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
+      "filename": "chatterbox/long_nimi_cb.wav",
+      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger — regardless of its actual type — because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times — winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
       "model": "chatterbox",
       "voice": "nimi_cb",
       "text_label": "long"
     },
     {
-      "filename": "long_default_male.wav",
-      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger \u2014 regardless of its actual type \u2014 because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times \u2014 winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
-      "model": "higgs",
-      "voice": "default_male",
-      "text_label": "long"
-    },
-    {
-      "filename": "long_default_female.wav",
-      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger \u2014 regardless of its actual type \u2014 because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times \u2014 winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
-      "model": "higgs",
-      "voice": "default_female",
-      "text_label": "long"
-    },
-    {
-      "filename": "ten_second_kronii_cb.wav",
+      "filename": "chatterbox/ten_second_kronii_cb.wav",
       "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
       "model": "chatterbox",
       "voice": "kronii_cb",
       "text_label": "ten_second"
     },
     {
-      "filename": "ten_second_nimi_cb.wav",
+      "filename": "chatterbox/ten_second_nimi_cb.wav",
       "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
       "model": "chatterbox",
       "voice": "nimi_cb",
       "text_label": "ten_second"
     },
     {
-      "filename": "ten_second_default_male.wav",
-      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
-      "model": "higgs",
-      "voice": "default_male",
-      "text_label": "ten_second"
-    },
-    {
-      "filename": "ten_second_default_female.wav",
-      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
-      "model": "higgs",
-      "voice": "default_female",
-      "text_label": "ten_second"
-    },
-    {
-      "filename": "numbers_kronii_cb.wav",
-      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "filename": "chatterbox/numbers_kronii_cb.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
       "model": "chatterbox",
       "voice": "kronii_cb",
       "text_label": "numbers"
     },
     {
-      "filename": "numbers_nimi_cb.wav",
-      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "filename": "chatterbox/numbers_nimi_cb.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
       "model": "chatterbox",
       "voice": "nimi_cb",
       "text_label": "numbers"
     },
     {
-      "filename": "numbers_default_male.wav",
-      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
-      "model": "higgs",
-      "voice": "default_male",
-      "text_label": "numbers"
-    },
-    {
-      "filename": "numbers_default_female.wav",
-      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes \u2014 so heavy it could only cross rivers by driving along the submerged riverbed.",
-      "model": "higgs",
-      "voice": "default_female",
-      "text_label": "numbers"
-    },
-    {
-      "filename": "expressive_kronii_cb.wav",
+      "filename": "chatterbox/expressive_kronii_cb.wav",
       "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
       "model": "chatterbox",
       "voice": "kronii_cb",
       "text_label": "expressive"
     },
     {
-      "filename": "expressive_nimi_cb.wav",
+      "filename": "chatterbox/expressive_nimi_cb.wav",
       "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
       "model": "chatterbox",
       "voice": "nimi_cb",
       "text_label": "expressive"
     },
     {
-      "filename": "expressive_default_male.wav",
+      "filename": "higgs/short_default_male.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "short"
+    },
+    {
+      "filename": "higgs/short_default_female.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "short"
+    },
+    {
+      "filename": "higgs/medium_default_male.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "medium"
+    },
+    {
+      "filename": "higgs/medium_default_female.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "medium"
+    },
+    {
+      "filename": "higgs/long_default_male.wav",
+      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger — regardless of its actual type — because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times — winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "long"
+    },
+    {
+      "filename": "higgs/long_default_female.wav",
+      "expected_text": "Did you know Allied soldiers called any enemy tank a Tiger — regardless of its actual type — because the Tiger I was so feared? The American M4 Sherman was produced over 49,000 times — winning through sheer quantity over German armor quality. The Soviet T-34 shocked German engineers so much they considered copying its sloped armor for their own future tank designs.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "long"
+    },
+    {
+      "filename": "higgs/ten_second_default_male.wav",
+      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "ten_second"
+    },
+    {
+      "filename": "higgs/ten_second_default_female.wav",
+      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "ten_second"
+    },
+    {
+      "filename": "higgs/numbers_default_male.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "higgs",
+      "voice": "default_male",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "higgs/numbers_default_female.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "higgs",
+      "voice": "default_female",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "higgs/expressive_default_male.wav",
       "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
       "model": "higgs",
       "voice": "default_male",
       "text_label": "expressive"
     },
     {
-      "filename": "expressive_default_female.wav",
+      "filename": "higgs/expressive_default_female.wav",
       "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
       "model": "higgs",
       "voice": "default_female",
+      "text_label": "expressive"
+    },
+    {
+      "filename": "qwen3/short_qwen3_ryan.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "qwen3",
+      "voice": "qwen3_ryan",
+      "text_label": "short"
+    },
+    {
+      "filename": "qwen3/short_qwen3_serena.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "qwen3",
+      "voice": "qwen3_serena",
+      "text_label": "short"
+    },
+    {
+      "filename": "qwen3/medium_qwen3_ryan.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
+      "model": "qwen3",
+      "voice": "qwen3_ryan",
+      "text_label": "medium"
+    },
+    {
+      "filename": "qwen3/medium_qwen3_serena.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
+      "model": "qwen3",
+      "voice": "qwen3_serena",
+      "text_label": "medium"
+    },
+    {
+      "filename": "qwen3/ten_second_qwen3_ryan.wav",
+      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
+      "model": "qwen3",
+      "voice": "qwen3_ryan",
+      "text_label": "ten_second"
+    },
+    {
+      "filename": "qwen3/ten_second_qwen3_serena.wav",
+      "expected_text": "Welcome to Chatterbox Turbo. [chuckle] This is a quick demonstration of natural, high-quality text to speech synthesis. We hope you enjoy the result.",
+      "model": "qwen3",
+      "voice": "qwen3_serena",
+      "text_label": "ten_second"
+    },
+    {
+      "filename": "qwen3/numbers_qwen3_ryan.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "qwen3",
+      "voice": "qwen3_ryan",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "qwen3/numbers_qwen3_serena.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "qwen3",
+      "voice": "qwen3_serena",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "qwen3/expressive_qwen3_ryan.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "qwen3",
+      "voice": "qwen3_ryan",
+      "text_label": "expressive"
+    },
+    {
+      "filename": "qwen3/expressive_qwen3_serena.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "qwen3",
+      "voice": "qwen3_serena",
+      "text_label": "expressive"
+    },
+    {
+      "filename": "qwen3_base/short_kronii-q3.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "qwen3_base",
+      "voice": "kronii-q3",
+      "text_label": "short"
+    },
+    {
+      "filename": "qwen3_base/medium_kronii-q3.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
+      "model": "qwen3_base",
+      "voice": "kronii-q3",
+      "text_label": "medium"
+    },
+    {
+      "filename": "qwen3_base/numbers_kronii-q3.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "qwen3_base",
+      "voice": "kronii-q3",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "qwen3_base/expressive_kronii-q3.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "qwen3_base",
+      "voice": "kronii-q3",
+      "text_label": "expressive"
+    },
+    {
+      "filename": "qwen3_base/short_nimi-q3.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "qwen3_base",
+      "voice": "nimi-q3",
+      "text_label": "short"
+    },
+    {
+      "filename": "qwen3_base/medium_nimi-q3.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
+      "model": "qwen3_base",
+      "voice": "nimi-q3",
+      "text_label": "medium"
+    },
+    {
+      "filename": "qwen3_base/numbers_nimi-q3.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "qwen3_base",
+      "voice": "nimi-q3",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "qwen3_base/expressive_nimi-q3.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "qwen3_base",
+      "voice": "nimi-q3",
+      "text_label": "expressive"
+    },
+    {
+      "filename": "qwen3_base/short_kronimi.wav",
+      "expected_text": "Did you know? The hamburger wasn't actually invented in Hamburg, Germany.",
+      "model": "qwen3_base",
+      "voice": "kronimi",
+      "text_label": "short"
+    },
+    {
+      "filename": "qwen3_base/medium_kronimi.wav",
+      "expected_text": "The first hamburger bun wasn't introduced until the 1904 World's Fair in St. Louis — before that, burgers were eaten with bread slices.",
+      "model": "qwen3_base",
+      "voice": "kronimi",
+      "text_label": "medium"
+    },
+    {
+      "filename": "qwen3_base/numbers_kronimi.wav",
+      "expected_text": "Germany's Panzer 8 Maus weighed 188 tonnes — so heavy it could only cross rivers by driving along the submerged riverbed.",
+      "model": "qwen3_base",
+      "voice": "kronimi",
+      "text_label": "numbers"
+    },
+    {
+      "filename": "qwen3_base/expressive_kronimi.wav",
+      "expected_text": "I can't believe they actually did it! [laugh] That was the most incredible thing I've ever seen, and honestly, I'm still in shock.",
+      "model": "qwen3_base",
+      "voice": "kronimi",
       "text_label": "expressive"
     }
   ]

@@ -9,7 +9,27 @@ Consolidated FastAPI TTS server that serves multiple model backends (Chatterbox,
 - **app/engine_base.py** — TTSEngine ABC
 - **app/engine_chatterbox.py** — Chatterbox Turbo wrapper
 - **app/engine_higgs.py** — Higgs Audio wrapper (requires faster-higgs-audio repo)
+- **app/engine_qwen3.py** — Qwen3-TTS wrapper (requires qwen-tts package)
 - **app/voices.py** — Unified VoiceStore with compatible_models tracking
+
+## Starting the server (agent instructions)
+
+The agent can and should start the server autonomously when needed (e.g. before running
+generate_artifacts.py or integration tests). Use the `higgs_tts` venv — it contains all
+three engines (qwen_tts, chatterbox-tts, faster-higgs-audio deps) and fastapi/uvicorn.
+
+```bash
+# Start in background (recommended — server takes ~5s to become ready)
+AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/higgs_tts/bin/uvicorn app.main:app \
+    --host 0.0.0.0 --port 8000 > /tmp/tts_server.log 2>&1 &
+
+# Wait for ready
+curl --retry 10 --retry-delay 2 --retry-connrefused -s http://localhost:8000/health
+```
+
+The `.env` file in the repo root is auto-loaded by the server; it contains `HF_TOKEN` and
+`ANTHROPIC_API_KEY`. For qwen3 Base voice cloning, the default `QWEN3_MODEL_ID` is already
+set to the Base model — no override needed.
 
 ## Key commands
 ```bash
@@ -31,6 +51,26 @@ python tests/generate_artifacts.py
 python tests/stt_validate.py --artifacts-dir tests/artifacts/ --manifest tests/manifest.json -v
 ```
 
+## Qwen3 Base voice cloning: reference text requirements
+
+When cloning a voice for the Base model, `reference_text` must match **only the first
+`_MAX_REF_SECONDS` (8s) of audio**, because the engine trims the reference audio to 8s
+before encoding. Providing the full transcript of a longer clip causes a mismatch that
+makes the model prepend the reference transcript to generated audio.
+
+To get an accurate 8s transcript, transcribe the trimmed audio with Whisper:
+```python
+import scipy.io.wavfile, tempfile
+from tests.stt_validate import transcribe_wav
+sr, data = scipy.io.wavfile.read("voices/<id>/reference.wav")
+with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+    scipy.io.wavfile.write(f.name, sr, data[:int(8.0 * sr)])
+    text = transcribe_wav(f.name)  # use this as reference_text
+```
+
+If you update `reference.txt`, delete `qwen3_prompt.pkl` (and any downstream blend pkls)
+so the engine recomputes the prompt on the next request.
+
 ## STT validation as a setup health check
 The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks transcription accuracy AND confirms a model is correctly set up. A model passing ≥ 85% of its test cases is considered correctly installed. Baseline: 21/24 pass (87.5%) on RTX 5070 Ti.
 
@@ -47,6 +87,9 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 - `HIGGS_REPO_PATH` — path to faster-higgs-audio repo (default /tmp/faster-higgs-audio)
 - `HIGGS_MODEL_ID` — HuggingFace model ID for higgs
 - `HIGGS_TOKENIZER_ID` — HuggingFace tokenizer ID for higgs
+- `QWEN3_MODEL_ID` — HuggingFace model ID for qwen3 (default Qwen/Qwen3-TTS-12Hz-1.7B-Base)
+- `QWEN3_DTYPE` — weight dtype for qwen3 (bfloat16 or float16, default bfloat16)
+- `QWEN3_VRAM_MB` — override VRAM budget estimate for qwen3 (default 5500)
 
 ## Conventions
 - Python 3.11, type hints throughout
@@ -54,6 +97,10 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 - One model in VRAM at a time; swap on request
 - Default model is chatterbox (when model field omitted from /tts)
 - Chatterbox and Higgs use separate venvs due to incompatible torch versions
+
+## Generated audio files
+- **`tests/artifacts/`** — manifest-tracked WAV samples produced by `generate_artifacts.py`. Git-ignored; regenerate with `python tests/generate_artifacts.py`.
+- **`tests/samples/`** — ad-hoc / exploratory audio (one-off voice tests, blending experiments, etc.). Also git-ignored. When generating temp audio during development, save it here rather than `/tmp` so it persists across sessions and stays co-located with the repo. Never save generated audio to system `/tmp`.
 
 ## API contract
 - The API is consumed by video_agent and potentially other repos. Changes to request/response shapes, status codes, or headers can break clients.
@@ -112,7 +159,7 @@ once it delivers its memo.
 | **Implementer** | Using the Researcher memo, write `app/engine_<name>.py` subclassing `TTSEngine`. Register in `model_manager.py`. Expose all features (including any new paralinguistic tags or voice params) as optional fields in `main.py`. Update `voices.py` `compatible_models` if cloning is supported. |
 | **Test writer** | Add engine test cases to `tests/test_integration.py`. Add manifest entries to `generate_artifacts.py`. Exclude the `long` text fixture from this engine's STT validation threshold (it is a known edge case with military proper nouns that cause STT noise for all models). |
 | **Docs updater** | Update `README.md` VRAM table, `docs/api.md` with new model name and any new params, and this `CLAUDE.md` under Environment variables and Architecture. |
-| **Validator** | Run `ruff check .`. Confirm all five `TTSEngine` abstract methods are implemented. Confirm no existing engine tests are broken. Run STT validation for the new engine (≥ 85% pass rate, excluding `long` fixtures). Report pass/fail on every checklist item. |
+| **Validator** | Run `ruff check .`. Confirm all five `TTSEngine` abstract methods are implemented. Confirm no existing engine tests are broken. Run `python tests/generate_artifacts.py --model <name>` to produce WAV artifacts, then run STT validation (`python tests/stt_validate.py --artifacts-dir tests/artifacts/ --manifest tests/manifest.json`) for the new engine (≥ 85% pass rate, excluding `long` fixtures). Report pass/fail on every checklist item. |
 
 ### Step 4 — Agent self-review (before human handoff)
 
@@ -130,6 +177,7 @@ The Validator must confirm every item below before surfacing the work to the use
 [ ] test_integration.py — test cases present
 [ ] generate_artifacts.py — manifest entries present, long fixture excluded
 [ ] ruff check . — PASSED
+[ ] generate_artifacts.py — `python tests/generate_artifacts.py --model <name>` run successfully
 [ ] STT validation — ≥ 85% pass (excluding long fixtures)
 [ ] Chatterbox and Higgs existing tests unaffected
 ```
@@ -148,7 +196,7 @@ Once the Validator is fully green, update the draft PR (created in Step 2):
 
 Present the user with:
 - The PR URL
-- The generated WAV files from `tests/artifacts/` for the new engine
+- The WAV files generated by the Validator step (in `tests/artifacts/`). If not already generated, run `python tests/generate_artifacts.py --model <name>` now before presenting.
 - One-line summary of any new features exposed
 
 The human listens to the audio and approves or rejects the PR.

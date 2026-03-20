@@ -15,14 +15,16 @@ The **video_agent** repo handles script writing and episode orchestration. This 
 
 ## Features
 
-- **Multi-model**: Chatterbox (350M, fast) and Higgs Audio (3B, expressive) behind one API
+- **Multi-model**: Chatterbox (350M, fast), Higgs Audio (3B, expressive), and Qwen3-TTS (1.7B, multilingual) behind one API
 - **Lazy loading**: Models load on first request, no VRAM used at idle
 - **Auto-unload**: Models unloaded after 60s idle to free VRAM
 - **VRAM-aware**: Only enables models that fit within configured VRAM budget
 - **Model swap**: Transparent swap when switching between models (unload → load)
 - **Voice management**: Clone, blend (Chatterbox), and description-only generation (Higgs)
 - **Paralinguistic tags**: Inline non-speech sounds for natural delivery
-- **Scene/speaker descriptions**: Prose-level control over delivery character (Higgs)
+- **Scene/speaker descriptions**: Prose-level control over delivery character (Higgs, Qwen3)
+- **Multilingual TTS**: 10 languages + 9 preset speakers (Qwen3)
+- **Tone/emotion instruct**: Natural language delivery control (Qwen3)
 
 ## Setup
 
@@ -53,6 +55,7 @@ pip install -e .
 # Install model backends
 pip install chatterbox-tts                          # Chatterbox Turbo
 pip install -e /tmp/faster-higgs-audio              # Higgs Audio
+pip install qwen-tts                                # Qwen3-TTS
 
 # chatterbox-tts pins torch==2.6.0 and will downgrade the torch installed above.
 # Blackwell GPUs (RTX 5070 Ti, sm_120) require torch 2.10.0+cu128 for CUDA kernel support.
@@ -79,6 +82,8 @@ HIGGS_QUANT_BITS=8               # 4, 8, or 0 (bf16, no quantization)
 HIGGS_REPO_PATH=/tmp/faster-higgs-audio
 HIGGS_MODEL_ID=bosonai/higgs-audio-v2-generation-3B-base
 HIGGS_TOKENIZER_ID=bosonai/higgs-audio-v2-tokenizer
+QWEN3_MODEL_ID=Qwen/Qwen3-TTS-12Hz-1.7B-Base  # Base=cloning, CustomVoice=preset speakers, VoiceDesign=description
+QWEN3_DTYPE=bfloat16             # bfloat16 or float16
 ANTHROPIC_API_KEY=sk-ant-...     # Optional, for LLM-adjudicated STT validation
 ```
 
@@ -127,6 +132,7 @@ curl http://localhost:8000/health
 See [docs/api.md](docs/api.md) for full request/response schemas. Model-specific parameters, quality tips, and paralinguistic tag references:
 - [docs/chatterbox.md](docs/chatterbox.md) — voice blending, sampling params, podcast quality tips
 - [docs/higgs.md](docs/higgs.md) — scene/speaker descriptions, cloning requirements, podcast quality tips
+- [docs/qwen3.md](docs/qwen3.md) — multilingual TTS, preset speakers, instruct params, voice cloning
 
 ## VRAM Usage (RTX 5070 Ti)
 
@@ -135,6 +141,7 @@ See [docs/api.md](docs/api.md) for full request/response schemas. Model-specific
 | Chatterbox Turbo | 4.2 GB | 4.4 GB | ~3s |
 | Higgs 8-bit | 6.7 GB | 7.1 GB | ~12s |
 | Higgs 4-bit | 4.2 GB | 5.0 GB | ~21s |
+| Qwen3-TTS 1.7B (bf16) | ~5.5 GB | TBD | ~8s (estimated) |
 
 See [docs/vram_management.md](docs/vram_management.md) for full profiling data.
 

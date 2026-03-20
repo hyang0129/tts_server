@@ -259,6 +259,80 @@ class TestHiggs:
 
 
 # ---------------------------------------------------------------------------
+# Qwen3 tests
+# ---------------------------------------------------------------------------
+
+
+class TestQwen3:
+    def test_qwen3_voice_design_generate(self):
+        """Generate TTS with qwen3 model using speaker_description (voice design)."""
+        wav_bytes = post_tts({
+            "text": "Did you know? The hamburger was not actually invented in Hamburg.",
+            "model": "qwen3",
+            "speaker_description": (
+                "A warm, clear female voice with a calm narration style"
+            ),
+        })
+        assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
+        assert len(wav_bytes) > 1000, "WAV file suspiciously small"
+
+    def test_qwen3_instruct_generate(self):
+        """Generate TTS with qwen3 model using qwen3_instruct param."""
+        wav_bytes = post_tts({
+            "text": "Did you know? The hamburger was not actually invented in Hamburg.",
+            "model": "qwen3",
+            "qwen3_language": "English",
+            "qwen3_instruct": "Speak in a warm, clear tone with calm narration style",
+        })
+        assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
+        assert len(wav_bytes) > 1000, "WAV file suspiciously small"
+
+    def test_qwen3_clone_and_generate(self):
+        """Clone a voice and generate TTS with qwen3 Base model."""
+        audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
+        if not audio_path.exists():
+            pytest.skip("kroniivoice_15s.wav fixture not found")
+        voice_id = clone_voice(
+            "test_kronii_q3",
+            audio_path,
+            "This is a sample of my voice for cloning purposes.",
+        )
+        wav_bytes = post_tts({
+            "text": "Did you know? The hamburger was not actually invented in Hamburg.",
+            "model": "qwen3",
+            "voice": voice_id,
+        })
+        assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
+        assert len(wav_bytes) > 1000, "WAV file suspiciously small"
+
+    def test_qwen3_stt_validation(self):
+        """Generate qwen3 TTS and validate transcription quality."""
+        expected_text = "Did you know? The hamburger was not actually invented in Hamburg."
+        wav_bytes = post_tts({
+            "text": expected_text,
+            "model": "qwen3",
+            "speaker_description": "A warm, clear male voice with calm narration style",
+        })
+        assert wav_bytes[:4] == b"RIFF"
+
+        tmp_path = FIXTURES_DIR.parent / "artifacts" / "_test_qwen3_stt.wav"
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path.write_bytes(wav_bytes)
+
+        try:
+            from tests.stt_validate import validate_file
+            result = validate_file(str(tmp_path), expected_text, use_llm=False)
+            assert result["word_match_pct"] >= 70.0, (
+                f"STT match too low: {result['word_match_pct']}% "
+                f"(transcription: {result['transcription']!r})"
+            )
+        except ImportError:
+            pytest.skip("stt_validate or faster-whisper not available")
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
 # Model switching tests
 # ---------------------------------------------------------------------------
 

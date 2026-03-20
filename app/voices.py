@@ -3,12 +3,14 @@ from __future__ import annotations
 import io
 import json
 import logging
+import pickle
 import re
 import shutil
 import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import soundfile as sf
 from pydantic import BaseModel
@@ -173,6 +175,13 @@ class VoiceStore:
             return txt_path.read_text().strip()
         return None
 
+    def get_qwen3_prompt_path(self, voice_id: str) -> Path | None:
+        """Return path to qwen3_prompt.pkl if it exists, else None."""
+        if voice_id not in self._index:
+            raise KeyError(voice_id)
+        pkl_path = self._base_dir / voice_id / "qwen3_prompt.pkl"
+        return pkl_path if pkl_path.exists() else None
+
     def get_conditionals_path(self, voice_id: str) -> Path | None:
         if voice_id not in self._index:
             raise KeyError(voice_id)
@@ -209,6 +218,8 @@ class VoiceStore:
             txt_path = voice_dir / "reference.txt"
             txt_path.write_text(reference_text)
             compatible.append("higgs")
+            # Qwen3 Base model also requires a transcript for voice cloning.
+            compatible.append("qwen3")
         # Chatterbox can use any reference WAV (no transcript needed).
         compatible.append("chatterbox")
 
@@ -265,6 +276,52 @@ class VoiceStore:
 
         self._index[voice_id] = meta
         logger.info("Created blended voice %r (id=%s)", name, voice_id)
+        return meta
+
+    def create_blended_qwen3_voice(
+        self,
+        name: str,
+        prompt_item: Any,
+        blend_config: dict,
+    ) -> VoiceMetadata:
+        """Store a blended Qwen3 VoiceClonePromptItem as a new voice.
+
+        No reference.wav is created — the voice is identified entirely by its
+        qwen3_prompt.pkl, which holds the blended speaker embedding + ref_code.
+        """
+        voice_id = _slugify(name)
+        if voice_id in self._index:
+            raise FileExistsError(voice_id)
+
+        voice_dir = self._base_dir / voice_id
+        voice_dir.mkdir(parents=True, exist_ok=False)
+
+        # Write pkl without mtime (no reference.wav to track).
+        pkl_path = voice_dir / "qwen3_prompt.pkl"
+        with pkl_path.open("wb") as f:
+            # Import _CACHE_VERSION lazily to avoid a hard dependency at import time.
+            try:
+                from app.engine_qwen3 import _CACHE_VERSION
+            except ImportError:
+                _CACHE_VERSION = 2
+            pickle.dump({"version": _CACHE_VERSION, "prompt_items": [prompt_item]}, f)
+
+        sources = f"{blend_config['voice_a']}+{blend_config['voice_b']}"
+        meta = VoiceMetadata(
+            voice_id=voice_id,
+            name=name,
+            original_filename=f"blend:{sources}",
+            created_at=datetime.now(timezone.utc),
+            duration_s=0.0,
+            sample_rate=24000,
+            compatible_models=["qwen3"],
+        )
+        raw = json.loads(meta.model_dump_json())
+        raw["blend_config"] = blend_config
+        (voice_dir / "metadata.json").write_text(json.dumps(raw, indent=2))
+
+        self._index[voice_id] = meta
+        logger.info("Created blended Qwen3 voice %r (id=%s)", name, voice_id)
         return meta
 
     def update_wpm(self, voice_id: str, wpm: float) -> None:

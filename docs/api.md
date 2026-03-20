@@ -13,12 +13,22 @@ Synthesize speech from text. The `model` field selects which TTS engine; the ser
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `text` | string (required) | -- | Text to synthesize (1–5000 chars, non-whitespace). Supports paralinguistic tags — see model docs. |
-| `model` | string | `"chatterbox"` | Engine: `"chatterbox"` or `"higgs"` |
+| `model` | string | `"chatterbox"` | Engine: `"chatterbox"`, `"higgs"`, or `"qwen3"` |
 | `voice` | string \| null | `null` | Voice ID. Must be compatible with the selected model. |
 | `temperature` | float | model default | Sampling temperature (0.0–2.0). Higher = more expressive/variable. |
 | `top_p` | float | 0.95 | Nucleus sampling threshold |
 
-For model-specific parameters see [chatterbox.md](chatterbox.md) and [higgs.md](higgs.md).
+For model-specific parameters see [chatterbox.md](chatterbox.md), [higgs.md](higgs.md), and [qwen3.md](qwen3.md).
+
+**Qwen3-specific parameters** (ignored by other models):
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `qwen3_language` | string \| null | `"Auto"` | Language hint: `"English"`, `"Chinese"`, `"Japanese"`, etc., or `"Auto"` |
+| `qwen3_speaker` | string \| null | null | Preset speaker name (CustomVoice models only). E.g. `"Ryan"`, `"Aiden"`. |
+| `qwen3_instruct` | string \| null | null | Tone/emotion instruction. E.g. `"Speak with warm enthusiasm"`. |
+
+`speaker_description` is also accepted for Qwen3 and maps to the `instruct` parameter (voice-design mode).
 
 **Response**: `audio/wav` (PCM 16-bit, mono)
 
@@ -68,7 +78,7 @@ Clone a voice from reference audio.
 ```
 
 **Voice compatibility rules**:
-- `reference_text` provided → compatible with both `higgs` and `chatterbox`
+- `reference_text` provided → compatible with `higgs`, `qwen3`, and `chatterbox`
 - `reference_text` omitted → compatible with `chatterbox` only
 
 **Status codes**: 201 created, 409 voice already exists, 422 validation error.
@@ -161,8 +171,9 @@ Server health and engine status.
   "status": "ok",
   "active_model": "chatterbox",
   "engines": {
-    "chatterbox": { "loaded": true,  "estimated_vram_mb": 3500, "sample_rate": 24000 },
-    "higgs":       { "loaded": false, "estimated_vram_mb": 9000, "sample_rate": 24000 }
+    "chatterbox": { "loaded": true,  "estimated_vram_mb": 4700, "sample_rate": 24000 },
+    "higgs":       { "loaded": false, "estimated_vram_mb": 9000, "sample_rate": 24000 },
+    "qwen3":       { "loaded": false, "estimated_vram_mb": 5500, "sample_rate": 24000 }
   },
   "available_vram_mb": 10000,
   "voices": 3
@@ -178,8 +189,9 @@ List available models with load status.
 **Response** (200):
 ```json
 [
-  { "name": "chatterbox", "available": true, "loaded": true,  "active": true,  "estimated_vram_mb": 3500, "sample_rate": 24000 },
-  { "name": "higgs",      "available": true, "loaded": false, "active": false, "estimated_vram_mb": 9000, "sample_rate": 24000 }
+  { "name": "chatterbox", "available": true, "loaded": true,  "active": true,  "estimated_vram_mb": 4700, "sample_rate": 24000 },
+  { "name": "higgs",      "available": true, "loaded": false, "active": false, "estimated_vram_mb": 9000, "sample_rate": 24000 },
+  { "name": "qwen3",      "available": true, "loaded": false, "active": false, "estimated_vram_mb": 5500, "sample_rate": 24000 }
 ]
 ```
 
@@ -190,18 +202,20 @@ List available models with load status.
 - **Lazy loading**: No model is loaded at startup; loading happens on first request.
 - **One-at-a-time**: Requesting a different model triggers unload of the current engine, then load of the new one.
 - **Idle auto-unload**: After 60s with no requests the active engine is unloaded to free VRAM.
-- **Swap time**: Chatterbox ~3s, Higgs 8-bit ~12s, Higgs 4-bit ~21s.
+- **Swap time**: Chatterbox ~3s, Higgs 8-bit ~12s, Higgs 4-bit ~21s, Qwen3 1.7B ~8s (estimated).
 
 ## Voice Compatibility Matrix
 
-| Feature | Chatterbox | Higgs |
-|---|---|---|
-| Reference audio only | Yes | No |
-| Reference audio + transcript | Yes | Yes (required) |
-| Pre-computed conditionals | Yes | No |
-| Voice blending | Yes | No |
-| Description-only (no voice) | No | Yes |
-| Sample rate | 24 kHz | 24 kHz |
+| Feature | Chatterbox | Higgs | Qwen3 |
+|---|---|---|---|
+| Reference audio only | Yes | No | No |
+| Reference audio + transcript | Yes | Yes (required) | Yes (Base model) |
+| Pre-computed conditionals | Yes | No | No |
+| Voice blending | Yes | No | No |
+| Description-only (no voice) | No | Yes | Yes (VoiceDesign/instruct) |
+| Preset speakers | No | No | Yes (CustomVoice model) |
+| Tone/emotion instruct | No | No | Yes |
+| Sample rate | 24 kHz | 24 kHz | 24 kHz |
 
 ## .env Configuration Reference
 
@@ -213,4 +227,7 @@ List available models with load status.
 | `HIGGS_REPO_PATH` | `/tmp/faster-higgs-audio` | Path to faster-higgs-audio source repo |
 | `HIGGS_MODEL_ID` | `bosonai/higgs-audio-v2-generation-3B-base` | HuggingFace model ID |
 | `HIGGS_TOKENIZER_ID` | `bosonai/higgs-audio-v2-tokenizer` | HuggingFace tokenizer ID |
+| `QWEN3_MODEL_ID` | `Qwen/Qwen3-TTS-12Hz-1.7B-Base` | Qwen3-TTS HuggingFace model ID. Variants: `Base` (cloning), `CustomVoice` (preset speakers), `VoiceDesign` (description). 0.6B variants also available. |
+| `QWEN3_DTYPE` | `bfloat16` | Qwen3 weight dtype: `bfloat16` or `float16` |
+| `QWEN3_VRAM_MB` | `5500` | Override Qwen3 VRAM budget estimate |
 | `HF_TOKEN` | -- | HuggingFace token for gated model access |
