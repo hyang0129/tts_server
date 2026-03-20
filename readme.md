@@ -26,6 +26,8 @@ The **video_agent** repo handles script writing and episode orchestration. This 
 
 ## Setup
 
+See [docs/setup.md](docs/setup.md) for a detailed setup guide including known dependency conflicts and verification steps.
+
 ### Prerequisites
 
 - NVIDIA GPU with CUDA 12.8+ support (tested on RTX 5070 Ti, 12GB)
@@ -51,6 +53,11 @@ pip install -e .
 # Install model backends
 pip install chatterbox-tts                          # Chatterbox Turbo
 pip install -e /tmp/faster-higgs-audio              # Higgs Audio
+
+# chatterbox-tts pins torch==2.6.0 and will downgrade the torch installed above.
+# Blackwell GPUs (RTX 5070 Ti, sm_120) require torch 2.10.0+cu128 for CUDA kernel support.
+# Reinstall torch after chatterbox-tts to restore Blackwell compatibility:
+pip install torch==2.10.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
 
 # Install higgs runtime deps (not declared by the package)
 pip install "transformers>=4.45.1,<4.47.0" accelerate bitsandbytes \
@@ -78,7 +85,7 @@ ANTHROPIC_API_KEY=sk-ant-...     # Optional, for LLM-adjudicated STT validation
 ### Run
 
 ```bash
-cd /workspaces/hub/repos/tts_server
+cd /workspaces/hub_1/tts_server
 source /workspaces/.venvs/tts_server/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
