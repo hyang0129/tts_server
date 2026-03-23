@@ -153,6 +153,29 @@ class TestHealth:
 
 
 # ---------------------------------------------------------------------------
+# Voice error tests
+# ---------------------------------------------------------------------------
+
+
+class TestVoiceErrors:
+    def test_unknown_voice_returns_404_with_error_code(self):
+        body = json.dumps({"model": "chatterbox", "text": "hello", "voice": "nonexistent-voice-xyz"}).encode()
+        req = urllib.request.Request(
+            f"{BASE_URL}/tts",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=30)
+        err = exc_info.value
+        assert err.code == 404
+        detail = json.loads(err.read())["detail"]
+        assert detail["error_code"] == "VOICE_NOT_REGISTERED"
+        assert detail["voice_id"] == "nonexistent-voice-xyz"
+
+
+# ---------------------------------------------------------------------------
 # Chatterbox tests
 # ---------------------------------------------------------------------------
 

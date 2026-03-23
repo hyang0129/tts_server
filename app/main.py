@@ -160,7 +160,14 @@ async def synthesize(req: TTSRequest) -> Response:
     if req.voice:
         meta = voice_store.get_voice(req.voice)
         if meta is None:
-            raise HTTPException(404, detail=f"Voice not found: {req.voice}")
+            raise HTTPException(
+                404,
+                detail={
+                    "detail": f"Voice not found: {req.voice}",
+                    "error_code": "VOICE_NOT_REGISTERED",
+                    "voice_id": req.voice,
+                },
+            )
         if model_name not in meta.compatible_models:
             raise HTTPException(
                 400,

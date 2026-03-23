@@ -61,6 +61,16 @@ For Turbo compatibility, `[laugh]` → `[laughter]`, `[chuckle]` → `[giggle]`,
 
 **Status codes**: 200 OK, 400 model unavailable or voice incompatible, 404 voice not found, 422 validation error.
 
+**404 voice-not-found error body** — machine-readable so clients can distinguish "voice missing, register it" from other 404s:
+```json
+{
+  "detail": "Voice not found: higgs-sable",
+  "error_code": "VOICE_NOT_REGISTERED",
+  "voice_id": "higgs-sable"
+}
+```
+Clients that catch `VOICE_NOT_REGISTERED` should call `POST /voices/clone` with the persona's reference WAV, then retry the original request.
+
 **Minimal example**:
 ```json
 {
