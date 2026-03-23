@@ -163,7 +163,7 @@ async def synthesize(req: TTSRequest) -> Response:
             raise HTTPException(
                 404,
                 detail={
-                    "detail": f"Voice not found: {req.voice}",
+                    "message": f"Voice not found: {req.voice}",
                     "error_code": "VOICE_NOT_REGISTERED",
                     "voice_id": req.voice,
                 },
