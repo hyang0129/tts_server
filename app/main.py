@@ -106,6 +106,15 @@ class TTSRequest(BaseModel):
             raise ValueError("text must contain non-whitespace characters")
         return v
 
+    @field_validator("voice_checksum")
+    @classmethod
+    def validate_checksum_format(cls, v: str | None) -> str | None:
+        if v is not None and (
+            len(v) != 64 or not all(c in "0123456789abcdefABCDEF" for c in v)
+        ):
+            raise ValueError("voice_checksum must be a 64-character hex string (SHA-256)")
+        return v
+
 
 class VoiceCreateResponse(BaseModel):
     voice_id: str
@@ -326,7 +335,9 @@ async def clone_voice(
         raise HTTPException(422, detail=str(exc))
 
     return VoiceCreateResponse(
-        voice_id=meta.voice_id, name=meta.name, wav_sha256=meta.wav_sha256 or None
+        voice_id=meta.voice_id,
+        name=meta.name,
+        wav_sha256=meta.wav_sha256 if meta.wav_sha256 else None,
     )
 
 

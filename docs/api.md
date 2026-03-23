@@ -15,7 +15,7 @@ Synthesize speech from text. The `model` field selects which TTS engine; the ser
 | `text` | string (required) | -- | Text to synthesize (1–5000 chars, non-whitespace). Supports paralinguistic tags — see model docs. |
 | `model` | string | `"chatterbox"` | Engine: `"chatterbox"`, `"chatterbox_full"`, `"higgs"`, or `"qwen3"` |
 | `voice` | string \| null | `null` | Voice ID. Must be compatible with the selected model. |
-| `voice_checksum` | string \| null | null | SHA-256 (first 16 hex chars) of the reference WAV. **Required when `voice` is specified.** Omitting it when `voice` is set returns 422. |
+| `voice_checksum` | string \| null | `null` | SHA-256 (64 hex chars) of the stored reference WAV. **Required when `voice` is specified.** Omitting it returns 422; wrong format returns 422; mismatch returns 409. Not validated for legacy voices registered before this feature (no-op passthrough). |
 | `temperature` | float | model default | Sampling temperature (0.0–2.0). Higher = more expressive/variable. |
 | `top_p` | float | 0.95 | Nucleus sampling threshold |
 
@@ -81,17 +81,26 @@ Clients that catch `VOICE_NOT_REGISTERED` should call `POST /voices/clone` with 
     "message": "Voice checksum mismatch for 'higgs-sable'",
     "error_code": "VOICE_CHECKSUM_MISMATCH",
     "voice_id": "higgs-sable",
-    "expected": "a3f2c1b0d9e7f012"
+    "expected": "a3f2c1b0d9e7f012a3f2c1b0d9e7f012a3f2c1b0d9e7f012a3f2c1b0d9e7f0"
   }
 }
 ```
 
-**Minimal example**:
+**Minimal example** (no voice):
+```json
+{
+  "model": "chatterbox",
+  "text": "Hello, how are you today?"
+}
+```
+
+**Example with voice**:
 ```json
 {
   "model": "chatterbox",
   "text": "Hello, how are you today?",
-  "voice": "kronimi7030"
+  "voice": "kronimi7030",
+  "voice_checksum": "a3f2c1b0d9e7f012a3f2c1b0d9e7f012a3f2c1b0d9e7f012a3f2c1b0d9e7f0"
 }
 ```
 
@@ -180,7 +189,8 @@ List registered voices.
       "duration_s": 15.0,
       "sample_rate": 48000,
       "wpm": 142.5,
-      "compatible_models": ["chatterbox", "higgs"]
+      "compatible_models": ["chatterbox", "higgs"],
+      "wav_sha256": "a3f2c1b0d9e7f012a3f2c1b0d9e7f012a3f2c1b0d9e7f012a3f2c1b0d9e7f0"
     }
   ]
 }

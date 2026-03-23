@@ -204,11 +204,10 @@ class VoiceStore:
         if voice_id in self._index:
             raise FileExistsError(voice_id)
 
-        wav_sha256 = hashlib.sha256(audio_bytes).hexdigest()[:16]
-
         wav_bytes, duration_s, sample_rate = _validate_reference_audio(
             audio_bytes, original_filename, max_duration_s=max_duration_s
         )
+        wav_sha256 = hashlib.sha256(wav_bytes).hexdigest()
 
         voice_dir = self._base_dir / voice_id
         voice_dir.mkdir(parents=True, exist_ok=False)

@@ -13,8 +13,10 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.request
@@ -221,10 +223,10 @@ def clone_voice_full(name: str, audio_path: Path, reference_text: str) -> dict:
         return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         if exc.code == 409:
-            # Already exists; re-fetch via GET to retrieve stored data
-            raise RuntimeError(
-                f"Voice '{name}' already exists; delete it or use a unique name."
-            ) from exc
+            # Already exists — fetch stored metadata so the caller gets wav_sha256.
+            slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+            get_resp = urllib.request.urlopen(f"{BASE_URL}/voices/{slug}", timeout=10)
+            return json.loads(get_resp.read())
         raise
 
 
@@ -251,8 +253,8 @@ class TestVoiceChecksum:
         """POST /voices/clone response includes a non-empty 16-char hex wav_sha256."""
         wav_sha256 = cloned_voice["wav_sha256"]
         assert wav_sha256 is not None, "wav_sha256 missing from clone response"
-        assert len(wav_sha256) == 16, (
-            f"Expected 16-char hex string, got {len(wav_sha256)!r} chars: {wav_sha256!r}"
+        assert len(wav_sha256) == 64, (
+            f"Expected 64-char hex string, got {len(wav_sha256)!r} chars: {wav_sha256!r}"
         )
         assert all(c in "0123456789abcdefABCDEF" for c in wav_sha256), (
             f"wav_sha256 is not a valid hex string: {wav_sha256!r}"
@@ -305,7 +307,7 @@ class TestVoiceChecksum:
             "model": "chatterbox",
             "text": "Checksum test.",
             "voice": cloned_voice["voice_id"],
-            "voice_checksum": "0000000000000000",
+            "voice_checksum": "0" * 64,
         }).encode()
         req = urllib.request.Request(
             f"{BASE_URL}/tts",
@@ -323,6 +325,17 @@ class TestVoiceChecksum:
         )
         assert detail["voice_id"] == cloned_voice["voice_id"], (
             f"Expected voice_id {cloned_voice['voice_id']!r}, got: {detail.get('voice_id')!r}"
+        )
+
+    def test_checksum_matches_wav_file(self, cloned_voice):
+        """wav_sha256 must equal SHA-256 of the fixture WAV bytes (end-to-end hash integrity)."""
+        audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
+        if not audio_path.exists():
+            pytest.skip("kroniivoice_15s.wav fixture not found")
+        expected = hashlib.sha256(audio_path.read_bytes()).hexdigest()
+        assert cloned_voice["wav_sha256"] == expected, (
+            f"Hash mismatch: server returned {cloned_voice['wav_sha256']!r}, "
+            f"local SHA-256 of fixture is {expected!r}"
         )
 
 
