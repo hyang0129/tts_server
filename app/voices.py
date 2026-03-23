@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import logging
@@ -42,6 +43,7 @@ class VoiceMetadata(BaseModel):
     sample_rate: int
     wpm: float | None = None
     compatible_models: list[str] = []
+    wav_sha256: str = ""
 
 
 class VoiceListResponse(BaseModel):
@@ -202,6 +204,8 @@ class VoiceStore:
         if voice_id in self._index:
             raise FileExistsError(voice_id)
 
+        wav_sha256 = hashlib.sha256(audio_bytes).hexdigest()[:16]
+
         wav_bytes, duration_s, sample_rate = _validate_reference_audio(
             audio_bytes, original_filename, max_duration_s=max_duration_s
         )
@@ -236,6 +240,7 @@ class VoiceStore:
             duration_s=round(duration_s, 2),
             sample_rate=sample_rate,
             compatible_models=sorted(set(compatible)),
+            wav_sha256=wav_sha256,
         )
         meta_path = voice_dir / "metadata.json"
         meta_path.write_text(meta.model_dump_json(indent=2))

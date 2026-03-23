@@ -15,6 +15,7 @@ Synthesize speech from text. The `model` field selects which TTS engine; the ser
 | `text` | string (required) | -- | Text to synthesize (1–5000 chars, non-whitespace). Supports paralinguistic tags — see model docs. |
 | `model` | string | `"chatterbox"` | Engine: `"chatterbox"`, `"chatterbox_full"`, `"higgs"`, or `"qwen3"` |
 | `voice` | string \| null | `null` | Voice ID. Must be compatible with the selected model. |
+| `voice_checksum` | string \| null | null | SHA-256 (first 16 hex chars) of the reference WAV. **Required when `voice` is specified.** Omitting it when `voice` is set returns 422. |
 | `temperature` | float | model default | Sampling temperature (0.0–2.0). Higher = more expressive/variable. |
 | `top_p` | float | 0.95 | Nucleus sampling threshold |
 
@@ -59,7 +60,7 @@ For Turbo compatibility, `[laugh]` → `[laughter]`, `[chuckle]` → `[giggle]`,
 | `X-Audio-Frames` | Total audio frames |
 | `X-Voice-WPM` | Voice words-per-minute (if calibrated) |
 
-**Status codes**: 200 OK, 400 model unavailable or voice incompatible, 404 voice not found, 422 validation error.
+**Status codes**: 200 OK, 400 model unavailable or voice incompatible, 404 voice not found, 409 voice checksum mismatch, 422 validation error.
 
 **404 voice-not-found error body** — machine-readable so clients can distinguish "voice missing, register it" from other 404s:
 ```json
@@ -72,6 +73,18 @@ For Turbo compatibility, `[laugh]` → `[laughter]`, `[chuckle]` → `[giggle]`,
 }
 ```
 Clients that catch `VOICE_NOT_REGISTERED` should call `POST /voices/clone` with the persona's reference WAV, then retry the original request.
+
+**409 voice-checksum-mismatch error body**:
+```json
+{
+  "detail": {
+    "message": "Voice checksum mismatch for 'higgs-sable'",
+    "error_code": "VOICE_CHECKSUM_MISMATCH",
+    "voice_id": "higgs-sable",
+    "expected": "a3f2c1b0d9e7f012"
+  }
+}
+```
 
 **Minimal example**:
 ```json
@@ -103,7 +116,8 @@ Clone a voice from reference audio.
 {
   "voice_id": "my-voice",
   "name": "My Voice",
-  "wpm": null
+  "wpm": null,
+  "wav_sha256": "a3f2c1b0d9e7f012"
 }
 ```
 
