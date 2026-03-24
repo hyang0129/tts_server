@@ -13,8 +13,10 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.request
@@ -150,6 +152,190 @@ class TestHealth:
         assert "models" in health or "available_models" in health
         models = health.get("models") or health.get("available_models", [])
         assert len(models) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Voice error tests
+# ---------------------------------------------------------------------------
+
+
+class TestVoiceErrors:
+    def test_unknown_voice_returns_404_with_error_code(self):
+        body = json.dumps({"model": "chatterbox", "text": "hello", "voice": "nonexistent-voice-xyz"}).encode()
+        req = urllib.request.Request(
+            f"{BASE_URL}/tts",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=30)
+        err = exc_info.value
+        assert err.code == 404
+        detail = json.loads(err.read())["detail"]
+        assert detail["error_code"] == "VOICE_NOT_REGISTERED"
+        assert detail["voice_id"] == "nonexistent-voice-xyz"
+
+
+# ---------------------------------------------------------------------------
+# Voice checksum tests
+# ---------------------------------------------------------------------------
+
+
+def clone_voice_full(name: str, audio_path: Path, reference_text: str) -> dict:
+    """Clone a voice and return the full response dict (voice_id, wav_sha256, etc.)."""
+    url = f"{BASE_URL}/voices/clone"
+    boundary = "----TestBoundary"
+    audio_bytes = audio_path.read_bytes()
+
+    body_parts = [
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="name"\r\n\r\n'
+        f"{name}\r\n",
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="reference_text"\r\n\r\n'
+        f"{reference_text}\r\n",
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="model"\r\n\r\n'
+        f"chatterbox\r\n",
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="reference_audio"; '
+        f'filename="{audio_path.name}"\r\n'
+        f"Content-Type: audio/wav\r\n\r\n",
+    ]
+    body = (
+        body_parts[0].encode()
+        + body_parts[1].encode()
+        + body_parts[2].encode()
+        + body_parts[3].encode()
+        + audio_bytes
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=300)
+        return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 409:
+            # Already exists — fetch stored metadata so the caller gets wav_sha256.
+            slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+            get_resp = urllib.request.urlopen(f"{BASE_URL}/voices/{slug}", timeout=10)
+            return json.loads(get_resp.read())
+        raise
+
+
+class TestVoiceChecksum:
+    """Tests for the voice checksum (wav_sha256) feature."""
+
+    @pytest.fixture(scope="class")
+    def cloned_voice(self):
+        """Clone a voice and return both voice_id and wav_sha256."""
+        audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
+        if not audio_path.exists():
+            pytest.skip("kroniivoice_15s.wav fixture not found")
+        data = clone_voice_full(
+            "test_kronii_checksum",
+            audio_path,
+            "This is a sample of my voice for cloning purposes.",
+        )
+        voice_id = data.get("voice_id") or data.get("id")
+        wav_sha256 = data.get("wav_sha256")
+        assert voice_id, "clone response missing voice_id"
+        return {"voice_id": voice_id, "wav_sha256": wav_sha256}
+
+    def test_clone_returns_wav_sha256(self, cloned_voice):
+        """POST /voices/clone response includes a non-empty 16-char hex wav_sha256."""
+        wav_sha256 = cloned_voice["wav_sha256"]
+        assert wav_sha256 is not None, "wav_sha256 missing from clone response"
+        assert len(wav_sha256) == 64, (
+            f"Expected 64-char hex string, got {len(wav_sha256)!r} chars: {wav_sha256!r}"
+        )
+        assert all(c in "0123456789abcdefABCDEF" for c in wav_sha256), (
+            f"wav_sha256 is not a valid hex string: {wav_sha256!r}"
+        )
+
+    def test_tts_without_checksum_returns_422(self, cloned_voice):
+        """POST /tts with voice set but voice_checksum omitted returns 422."""
+        body = json.dumps({
+            "model": "chatterbox",
+            "text": "Checksum test.",
+            "voice": cloned_voice["voice_id"],
+        }).encode()
+        req = urllib.request.Request(
+            f"{BASE_URL}/tts",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=30)
+        assert exc_info.value.code == 422
+
+    def test_tts_with_correct_checksum_returns_200(self, cloned_voice):
+        """POST /tts with correct voice_checksum returns 200 audio/wav."""
+        body = json.dumps({
+            "model": "chatterbox",
+            "text": "Checksum test.",
+            "voice": cloned_voice["voice_id"],
+            "voice_checksum": cloned_voice["wav_sha256"],
+        }).encode()
+        req = urllib.request.Request(
+            f"{BASE_URL}/tts",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        resp = urllib.request.urlopen(req, timeout=120)
+        assert resp.status == 200
+        content_type = resp.headers.get("Content-Type", "")
+        assert "audio/wav" in content_type, (
+            f"Expected audio/wav response, got Content-Type: {content_type!r}"
+        )
+        wav_bytes = resp.read()
+        assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
+        assert len(wav_bytes) > 1000, "WAV file suspiciously small"
+
+    def test_tts_with_wrong_checksum_returns_409(self, cloned_voice):
+        """POST /tts with wrong voice_checksum returns 409 VOICE_CHECKSUM_MISMATCH."""
+        body = json.dumps({
+            "model": "chatterbox",
+            "text": "Checksum test.",
+            "voice": cloned_voice["voice_id"],
+            "voice_checksum": "0" * 64,
+        }).encode()
+        req = urllib.request.Request(
+            f"{BASE_URL}/tts",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=30)
+        err = exc_info.value
+        assert err.code == 409
+        detail = json.loads(err.read())["detail"]
+        assert detail["error_code"] == "VOICE_CHECKSUM_MISMATCH", (
+            f"Expected error_code VOICE_CHECKSUM_MISMATCH, got: {detail.get('error_code')!r}"
+        )
+        assert detail["voice_id"] == cloned_voice["voice_id"], (
+            f"Expected voice_id {cloned_voice['voice_id']!r}, got: {detail.get('voice_id')!r}"
+        )
+
+    def test_checksum_matches_wav_file(self, cloned_voice):
+        """wav_sha256 must equal SHA-256 of the fixture WAV bytes (end-to-end hash integrity)."""
+        voices_dir = os.environ.get("TTS_VOICES_DIR", "voices")
+        ref_wav = Path(voices_dir) / cloned_voice["voice_id"] / "reference.wav"
+        expected = hashlib.sha256(ref_wav.read_bytes()).hexdigest()
+        assert cloned_voice["wav_sha256"] == expected, (
+            f"Hash mismatch: server returned {cloned_voice['wav_sha256']!r}, "
+            f"local SHA-256 of fixture is {expected!r}"
+        )
 
 
 # ---------------------------------------------------------------------------

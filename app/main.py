@@ -96,6 +96,8 @@ class TTSRequest(BaseModel):
     qwen3_language: str | None = None
     qwen3_speaker: str | None = None
     qwen3_instruct: str | None = None
+    # Voice integrity
+    voice_checksum: str | None = None
 
     @field_validator("text")
     @classmethod
@@ -104,11 +106,21 @@ class TTSRequest(BaseModel):
             raise ValueError("text must contain non-whitespace characters")
         return v
 
+    @field_validator("voice_checksum")
+    @classmethod
+    def validate_checksum_format(cls, v: str | None) -> str | None:
+        if v is not None:
+            v = v.lower()
+            if len(v) != 64 or not all(c in "0123456789abcdef" for c in v):
+                raise ValueError("voice_checksum must be a 64-character hex string (SHA-256)")
+        return v
+
 
 class VoiceCreateResponse(BaseModel):
     voice_id: str
     name: str
     wpm: float | None = None
+    wav_sha256: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -160,13 +172,35 @@ async def synthesize(req: TTSRequest) -> Response:
     if req.voice:
         meta = voice_store.get_voice(req.voice)
         if meta is None:
-            raise HTTPException(404, detail=f"Voice not found: {req.voice}")
+            raise HTTPException(
+                404,
+                detail={
+                    "message": f"Voice not found: {req.voice}",
+                    "error_code": "VOICE_NOT_REGISTERED",
+                    "voice_id": req.voice,
+                },
+            )
         if model_name not in meta.compatible_models:
             raise HTTPException(
                 400,
                 detail=f"Voice '{req.voice}' is not compatible with model '{model_name}'. "
                 f"Compatible models: {meta.compatible_models}",
             )
+
+        # Voice checksum validation
+        if req.voice_checksum is None:
+            raise HTTPException(422, detail="voice_checksum is required when voice is specified")
+        if meta.wav_sha256 and req.voice_checksum != meta.wav_sha256:
+            raise HTTPException(
+                409,
+                detail={
+                    "message": f"Voice checksum mismatch for '{req.voice}'",
+                    "error_code": "VOICE_CHECKSUM_MISMATCH",
+                    "voice_id": req.voice,
+                    "expected": meta.wav_sha256,
+                },
+            )
+        # If meta.wav_sha256 is "" (legacy voice), allow through without error.
 
         # For chatterbox, prefer conditionals if available
         if model_name == "chatterbox":
@@ -300,7 +334,11 @@ async def clone_voice(
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc))
 
-    return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
+    return VoiceCreateResponse(
+        voice_id=meta.voice_id,
+        name=meta.name,
+        wav_sha256=meta.wav_sha256 if meta.wav_sha256 else None,
+    )
 
 
 # ---------------------------------------------------------------------------
