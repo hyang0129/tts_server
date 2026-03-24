@@ -1,3 +1,10 @@
+# tts-server uses separate per-engine venvs to avoid transformers version conflicts:
+#   /workspaces/.venvs/tts_server          — host (FastAPI server only, listed below)
+#   /workspaces/.venvs/tts_server-chatterbox — requirements-chatterbox.txt
+#   /workspaces/.venvs/tts_server-higgs    — requirements-higgs.txt (transformers<4.47.0)
+#   /workspaces/.venvs/tts_server-qwen3    — requirements-qwen3.txt (transformers>=4.57.3)
+# Run `bash scripts/setup_venvs.sh` to create and populate all venvs.
+
 [project]
 name = "tts-server"
 version = "0.1.0"
@@ -9,11 +16,8 @@ dependencies = [
     "pydantic>=2.0",
     "soundfile>=0.12",
     "numpy>=1.24",
-    "torch>=2.0",
+    "scipy>=1.10",
 ]
-
-[project.optional-dependencies]
-chatterbox = ["chatterbox-tts"]
 
 [tool.ruff]
 line-length = 100

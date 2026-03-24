@@ -12,15 +12,40 @@ Consolidated FastAPI TTS server that serves multiple model backends (Chatterbox,
 - **app/engine_higgs.py** — Higgs Audio wrapper (requires faster-higgs-audio repo)
 - **app/engine_qwen3.py** — Qwen3-TTS wrapper (requires qwen-tts package)
 - **app/voices.py** — Unified VoiceStore with compatible_models tracking
+- **workers/worker_protocol.py** — JSON-RPC protocol (stdlib-only)
+- **workers/chatterbox_worker.py** — Chatterbox Turbo subprocess worker
+- **workers/chatterbox_full_worker.py** — Chatterbox Full subprocess worker
+- **workers/higgs_worker.py** — Higgs subprocess worker
+- **workers/qwen3_worker.py** — Qwen3 subprocess worker
+
+## Venv layout
+
+The host process and each engine run in separate isolated venvs:
+
+| Venv | Path | Engines | Key constraint |
+|------|------|---------|----------------|
+| Host | `/workspaces/.venvs/tts_server/` | FastAPI server | fastapi, uvicorn, pydantic — no torch, no engine packages |
+| Chatterbox | `/workspaces/.venvs/tts_server-chatterbox/` | chatterbox, chatterbox_full | chatterbox-tts |
+| Higgs | `/workspaces/.venvs/tts_server-higgs/` | higgs | transformers<4.47.0 |
+| Qwen3 | `/workspaces/.venvs/tts_server-qwen3/` | qwen3 | transformers>=4.57.3 |
+
+One-time setup to create all engine venvs:
+
+```bash
+# Run from repo root
+bash scripts/setup_venvs.sh
+```
 
 ## Starting the server (agent instructions)
 
 The agent can and should start the server autonomously when needed (e.g. before running
-generate_artifacts.py or integration tests). Use the `tts_server` venv — it contains all
-engines (chatterbox-tts, faster-higgs-audio deps, qwen-tts) and fastapi/uvicorn.
+generate_artifacts.py or integration tests). Use the host venv (`/workspaces/.venvs/tts_server/`)
+to start the server — it contains fastapi and uvicorn. Each engine subprocess is launched in its
+own engine venv automatically by the model manager.
 
 ```bash
 # Start in background (recommended — server takes ~5s to become ready)
+# Note: uses the host venv, which contains fastapi/uvicorn only (no engine packages)
 AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/uvicorn app.main:app \
     --host 0.0.0.0 --port 8000 > /tmp/tts_server.log 2>&1 &
 
@@ -130,7 +155,7 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 - Ruff for linting (line-length 100)
 - One model in VRAM at a time; swap on request
 - Default model is chatterbox (when model field omitted from /tts)
-- Chatterbox and Higgs use separate venvs due to incompatible torch versions
+- Each engine (Chatterbox, Higgs, Qwen3) runs in its own venv as a subprocess worker to isolate incompatible transformers versions.
 
 ## Generated audio files
 - **`tests/artifacts/`** — manifest-tracked WAV samples produced by `generate_artifacts.py`. Git-ignored; regenerate with `python tests/generate_artifacts.py`.

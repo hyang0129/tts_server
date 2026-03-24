@@ -1,0 +1,27 @@
+torch>=2.0
+torchaudio>=2.0
+transformers<4.47.0
+accelerate
+numpy>=1.24
+# Runtime deps required by faster-higgs-audio (not declared in its package metadata):
+librosa
+vector-quantize-pytorch
+descript-audio-codec
+descript-audiotools
+omegaconf
+langid
+jieba
+click
+loguru
+pyyaml
+dacite
+pandas
+pydub
+bitsandbytes
+# faster-higgs-audio is NOT available on PyPI.
+# It is installed from the cloned repo at /tmp/faster-higgs-audio via sys.path
+# manipulation in the Higgs worker (see workers/higgs_worker.py and HIGGS_REPO_PATH
+# env var). The package exposes itself as boson_multimodal.
+# To set it up manually:
+#   git clone https://github.com/bosonai/faster-higgs-audio /tmp/faster-higgs-audio
+#   (no pip install needed — the worker adds it to sys.path at runtime)

@@ -1,0 +1,7 @@
+torch>=2.0
+torchaudio>=2.0
+transformers>=4.57.3
+accelerate
+numpy>=1.24
+scipy>=1.10
+qwen-tts

@@ -5,8 +5,6 @@ import gc
 import logging
 import time
 
-import torch
-
 from app.engine_base import TTSEngine
 
 logger = logging.getLogger(__name__)
@@ -90,9 +88,7 @@ class ModelManager:
         engine = self._engines[self._active_engine]
         logger.info("Unloading engine: %s", self._active_engine)
         await engine.unload()
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        gc.collect()  # harmless, keep
         self._active_engine = None
         logger.info("VRAM freed")
 

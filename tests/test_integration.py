@@ -149,9 +149,28 @@ class TestHealth:
 
     def test_health_lists_models(self):
         health = get_health()
-        assert "models" in health or "available_models" in health
-        models = health.get("models") or health.get("available_models", [])
+        assert "models" in health or "available_models" in health or "engines" in health
+        models = health.get("models") or health.get("available_models") or list(health.get("engines", {}).keys())
         assert len(models) >= 1
+
+    def test_engines_not_loaded_at_startup(self):
+        """All engines must report loaded=false before any TTS request is made.
+
+        This test is placed first in the session-level execution order so it
+        runs while the server is still in its initial idle state.  It uses the
+        /health endpoint rather than inspecting Python objects directly, because
+        engines now run as subprocess workers in separate venvs.
+        """
+        health = get_health()
+        engines = health.get("engines", {})
+        # The health response must expose at least one engine entry.
+        assert engines, "Expected 'engines' dict in /health response"
+        for name, status in engines.items():
+            assert "loaded" in status, f"Engine {name!r} missing 'loaded' field in /health"
+            assert status["loaded"] is False, (
+                f"Engine {name!r} should not be loaded at startup, "
+                f"but /health reports loaded={status['loaded']!r}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +369,7 @@ class TestChatterbox:
         audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
         if not audio_path.exists():
             pytest.skip("kroniivoice_15s.wav fixture not found")
-        return clone_voice(
+        return clone_voice_full(
             "test_kronii_cb",
             audio_path,
             "This is a sample of my voice for cloning purposes.",
@@ -361,7 +380,8 @@ class TestChatterbox:
         wav_bytes = post_tts({
             "text": "Did you know? The hamburger was not actually invented in Hamburg.",
             "model": "chatterbox",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
         })
         # WAV files start with RIFF header
         assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
@@ -373,7 +393,8 @@ class TestChatterbox:
         wav_bytes = post_tts({
             "text": expected_text,
             "model": "chatterbox",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
         })
         assert wav_bytes[:4] == b"RIFF"
 
@@ -407,7 +428,7 @@ class TestChatterboxFull:
         audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
         if not audio_path.exists():
             pytest.skip("kroniivoice_15s.wav fixture not found")
-        return clone_voice(
+        return clone_voice_full(
             "test_kronii_cbfull",
             audio_path,
             "This is a sample of my voice for cloning purposes.",
@@ -418,7 +439,8 @@ class TestChatterboxFull:
         wav_bytes = post_tts({
             "text": "Did you know? The hamburger was not actually invented in Hamburg.",
             "model": "chatterbox_full",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
         })
         # WAV files start with RIFF header
         assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
@@ -429,7 +451,8 @@ class TestChatterboxFull:
         wav_bytes = post_tts({
             "text": "Did you know? The hamburger was not actually invented in Hamburg.",
             "model": "chatterbox_full",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
             "exaggeration": 0.8,
         })
         assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
@@ -440,7 +463,8 @@ class TestChatterboxFull:
         wav_bytes = post_tts({
             "text": expected_text,
             "model": "chatterbox_full",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
         })
         assert wav_bytes[:4] == b"RIFF"
 
@@ -545,7 +569,7 @@ class TestQwen3:
         audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
         if not audio_path.exists():
             pytest.skip("kroniivoice_15s.wav fixture not found")
-        voice_id = clone_voice(
+        voice_data = clone_voice_full(
             "test_kronii_q3",
             audio_path,
             "This is a sample of my voice for cloning purposes.",
@@ -553,7 +577,8 @@ class TestQwen3:
         wav_bytes = post_tts({
             "text": "Did you know? The hamburger was not actually invented in Hamburg.",
             "model": "qwen3",
-            "voice": voice_id,
+            "voice": voice_data["voice_id"],
+            "voice_checksum": voice_data["wav_sha256"],
         })
         assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
         assert len(wav_bytes) > 1000, "WAV file suspiciously small"
@@ -598,22 +623,27 @@ class TestModelSwitching:
         audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
         if not audio_path.exists():
             pytest.skip("kroniivoice_15s.wav fixture not found")
-        return clone_voice(
+        return clone_voice_full(
             "test_switch_kronii",
             audio_path,
             "This is a sample of my voice for cloning purposes.",
         )
 
     def test_chatterbox_then_higgs_then_chatterbox(self, cb_voice_id):
-        """Switch models: chatterbox -> higgs -> chatterbox."""
+        """Switch models: chatterbox -> higgs -> chatterbox.
+
+        Each hop involves subprocess spawn/teardown, so a generous per-request
+        timeout of 120s is set explicitly on every post_tts call.
+        """
         short_text = "Testing model switching capabilities."
 
         # 1. Chatterbox request
         wav1 = post_tts({
             "text": short_text,
             "model": "chatterbox",
-            "voice": cb_voice_id,
-        })
+            "voice": cb_voice_id["voice_id"],
+            "voice_checksum": cb_voice_id["wav_sha256"],
+        }, timeout=120)
         assert wav1[:4] == b"RIFF"
 
         # Verify health shows chatterbox active
@@ -622,12 +652,12 @@ class TestModelSwitching:
         if active:
             assert active == "chatterbox", f"Expected chatterbox active, got {active}"
 
-        # 2. Higgs request (triggers model swap)
+        # 2. Higgs request (triggers model swap — subprocess teardown + spawn)
         wav2 = post_tts({
             "text": short_text,
             "model": "higgs",
             "speaker_description": "Male, moderate pitch, neutral accent",
-        })
+        }, timeout=120)
         assert wav2[:4] == b"RIFF"
 
         # Verify health shows higgs active
@@ -636,12 +666,13 @@ class TestModelSwitching:
         if active:
             assert active == "higgs", f"Expected higgs active, got {active}"
 
-        # 3. Back to chatterbox
+        # 3. Back to chatterbox (another subprocess swap)
         wav3 = post_tts({
             "text": short_text,
             "model": "chatterbox",
-            "voice": cb_voice_id,
-        })
+            "voice": cb_voice_id["voice_id"],
+            "voice_checksum": cb_voice_id["wav_sha256"],
+        }, timeout=120)
         assert wav3[:4] == b"RIFF"
 
 
