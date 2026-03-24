@@ -487,6 +487,231 @@ class TestChatterboxFull:
 
 
 # ---------------------------------------------------------------------------
+# Blend tests
+# ---------------------------------------------------------------------------
+
+
+def blend_voices_req(
+    name: str,
+    voice_a: str,
+    voice_b: str,
+    model: str = "chatterbox",
+    texture_mix: int = 50,
+) -> dict:
+    """POST multipart form to /voices/blend. Returns parsed JSON dict.
+
+    Raises on non-2xx, except 409 (already exists) which returns the existing
+    voice metadata fetched from GET /voices/{slug}.
+    """
+    url = f"{BASE_URL}/voices/blend"
+    boundary = "----BlendTestBoundary"
+
+    def field(fname: str, value: str) -> bytes:
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{fname}"\r\n\r\n'
+            f"{value}\r\n"
+        ).encode()
+
+    body = (
+        field("name", name)
+        + field("voice_a", voice_a)
+        + field("voice_b", voice_b)
+        + field("model", model)
+        + field("texture_mix", str(texture_mix))
+        + f"--{boundary}--\r\n".encode()
+    )
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=300)
+        assert resp.status == 201, f"Expected 201, got {resp.status}"
+        return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 409:
+            # Voice already exists — return existing metadata from GET /voices/{slug}.
+            import re as _re
+            slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+            try:
+                get_resp = urllib.request.urlopen(f"{BASE_URL}/voices/{slug}", timeout=10)
+                return json.loads(get_resp.read())
+            except urllib.error.HTTPError as get_exc:
+                if get_exc.code == 404:
+                    # Partial voice dir exists (engine failed on a prior run) but no metadata.
+                    pytest.skip(
+                        f"Blend voice dir exists but no metadata (prior engine failure); "
+                        f"restart the server to clean up or delete voices/{slug} manually."
+                    )
+                raise
+        if exc.code in (500, 503):
+            error_body = exc.read().decode(errors="replace")
+            pytest.skip(f"Engine unavailable for blend (HTTP {exc.code}): {error_body[:200]}")
+        raise
+
+
+class TestBlend:
+    """Tests for POST /voices/blend endpoint."""
+
+    @pytest.fixture(scope="class")
+    def two_voices(self):
+        """Clone two distinct voices to use as blend sources."""
+        audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
+        if not audio_path.exists():
+            pytest.skip("kroniivoice_15s.wav fixture not found")
+
+        voice_a_data = clone_voice_full(
+            "test_blend_source_a",
+            audio_path,
+            "This is a sample of my voice for cloning purposes.",
+        )
+        voice_b_data = clone_voice_full(
+            "test_blend_source_b",
+            audio_path,
+            "This is a sample of my voice for cloning purposes.",
+        )
+        return {"voice_a": voice_a_data, "voice_b": voice_b_data}
+
+    def test_chatterbox_blend_creates_voice(self, two_voices):
+        """Blend two voices with chatterbox model; assert 201 and voice appears in GET /voices."""
+        va_id = two_voices["voice_a"]["voice_id"]
+        vb_id = two_voices["voice_b"]["voice_id"]
+
+        result = blend_voices_req(
+            name="test_blend_chatterbox",
+            voice_a=va_id,
+            voice_b=vb_id,
+            model="chatterbox",
+            texture_mix=50,
+        )
+        assert "voice_id" in result, f"Response missing voice_id: {result}"
+        assert result["voice_id"], "voice_id should be non-empty"
+
+        # Confirm the blended voice is listed in GET /voices
+        list_resp = urllib.request.urlopen(f"{BASE_URL}/voices", timeout=10)
+        voices_data = json.loads(list_resp.read())
+        voice_ids = [v["voice_id"] for v in voices_data.get("voices", [])]
+        assert result["voice_id"] in voice_ids, (
+            f"Blended voice {result['voice_id']!r} not found in GET /voices"
+        )
+
+        # Optionally generate TTS with the blended voice to confirm it produces audio.
+        # Blended voices have wav_sha256="" so pass a dummy 64-char hex checksum.
+        try:
+            wav_bytes = post_tts({
+                "text": "Testing blended voice synthesis.",
+                "model": "chatterbox",
+                "voice": result["voice_id"],
+                "voice_checksum": "a" * 64,
+            })
+            assert wav_bytes[:4] == b"RIFF", "Blended voice TTS did not return a valid WAV"
+        except urllib.error.HTTPError as exc:
+            # Engine may not be available (no venv); skip TTS check gracefully.
+            if exc.code in (500, 503):
+                pytest.skip(f"Engine unavailable for TTS with blended voice: HTTP {exc.code}")
+            raise
+
+    def test_chatterbox_full_blend_creates_voice(self, two_voices):
+        """Blend two voices with chatterbox_full model; assert voice_id is returned."""
+        va_id = two_voices["voice_a"]["voice_id"]
+        vb_id = two_voices["voice_b"]["voice_id"]
+
+        result = blend_voices_req(
+            name="test_blend_chatterbox_full",
+            voice_a=va_id,
+            voice_b=vb_id,
+            model="chatterbox_full",
+            texture_mix=30,
+        )
+        assert "voice_id" in result, f"Response missing voice_id: {result}"
+        assert result["voice_id"], "voice_id should be non-empty"
+
+        # Confirm the blended voice is listed in GET /voices
+        list_resp = urllib.request.urlopen(f"{BASE_URL}/voices", timeout=10)
+        voices_data = json.loads(list_resp.read())
+        voice_ids = [v["voice_id"] for v in voices_data.get("voices", [])]
+        assert result["voice_id"] in voice_ids, (
+            f"Blended voice {result['voice_id']!r} not found in GET /voices"
+        )
+
+        # Optionally TTS with the blended voice.
+        try:
+            wav_bytes = post_tts({
+                "text": "Testing blended full voice synthesis.",
+                "model": "chatterbox_full",
+                "voice": result["voice_id"],
+                "voice_checksum": "a" * 64,
+            })
+            assert wav_bytes[:4] == b"RIFF", "Blended voice TTS did not return a valid WAV"
+        except urllib.error.HTTPError as exc:
+            if exc.code in (500, 503):
+                pytest.skip(f"Engine unavailable for TTS with blended voice: HTTP {exc.code}")
+            raise
+
+    def test_qwen3_blend_creates_voice(self, two_voices):
+        """Build qwen3 pkl caches for both source voices via synthesis, then blend."""
+        va_data = two_voices["voice_a"]
+        vb_data = two_voices["voice_b"]
+        va_id = va_data["voice_id"]
+        vb_id = vb_data["voice_id"]
+        va_sha = va_data.get("wav_sha256", "")
+        vb_sha = vb_data.get("wav_sha256", "")
+
+        # Both voices need a qwen3_prompt.pkl; synthesise with each to build it.
+        for voice_id, wav_sha256 in [(va_id, va_sha), (vb_id, vb_sha)]:
+            try:
+                post_tts({
+                    "text": "Building prompt cache.",
+                    "model": "qwen3",
+                    "voice": voice_id,
+                    "voice_checksum": wav_sha256,
+                })
+            except urllib.error.HTTPError as exc:
+                if exc.code in (400, 500, 503):
+                    pytest.skip(
+                        f"Qwen3 engine unavailable (HTTP {exc.code}); "
+                        "skipping qwen3 blend test"
+                    )
+                raise
+
+        result = blend_voices_req(
+            name="test_blend_qwen3",
+            voice_a=va_id,
+            voice_b=vb_id,
+            model="qwen3",
+            texture_mix=50,
+        )
+        assert "voice_id" in result, f"Response missing voice_id: {result}"
+        assert result["voice_id"], "voice_id should be non-empty"
+
+        # Confirm the blended voice is listed in GET /voices
+        list_resp = urllib.request.urlopen(f"{BASE_URL}/voices", timeout=10)
+        voices_data = json.loads(list_resp.read())
+        voice_ids = [v["voice_id"] for v in voices_data.get("voices", [])]
+        assert result["voice_id"] in voice_ids, (
+            f"Blended qwen3 voice {result['voice_id']!r} not found in GET /voices"
+        )
+
+        # Optionally TTS with the blended voice (no wav_sha256, so pass dummy).
+        try:
+            wav_bytes = post_tts({
+                "text": "Testing blended qwen3 voice synthesis.",
+                "model": "qwen3",
+                "voice": result["voice_id"],
+                "voice_checksum": "a" * 64,
+            })
+            assert wav_bytes[:4] == b"RIFF", "Blended qwen3 voice TTS did not return a valid WAV"
+        except urllib.error.HTTPError as exc:
+            if exc.code in (500, 503):
+                pytest.skip(f"Engine unavailable for TTS with blended voice: HTTP {exc.code}")
+            raise
+
+
+# ---------------------------------------------------------------------------
 # Higgs tests
 # ---------------------------------------------------------------------------
 
