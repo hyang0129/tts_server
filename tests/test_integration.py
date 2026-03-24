@@ -329,10 +329,9 @@ class TestVoiceChecksum:
 
     def test_checksum_matches_wav_file(self, cloned_voice):
         """wav_sha256 must equal SHA-256 of the fixture WAV bytes (end-to-end hash integrity)."""
-        audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
-        if not audio_path.exists():
-            pytest.skip("kroniivoice_15s.wav fixture not found")
-        expected = hashlib.sha256(audio_path.read_bytes()).hexdigest()
+        voices_dir = os.environ.get("TTS_VOICES_DIR", "voices")
+        ref_wav = Path(voices_dir) / cloned_voice["voice_id"] / "reference.wav"
+        expected = hashlib.sha256(ref_wav.read_bytes()).hexdigest()
         assert cloned_voice["wav_sha256"] == expected, (
             f"Hash mismatch: server returned {cloned_voice['wav_sha256']!r}, "
             f"local SHA-256 of fixture is {expected!r}"

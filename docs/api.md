@@ -126,7 +126,7 @@ Clone a voice from reference audio.
   "voice_id": "my-voice",
   "name": "My Voice",
   "wpm": null,
-  "wav_sha256": "a3f2c1b0d9e7f012"
+  "wav_sha256": "a3f2c1b0d9e7f012a3f2c1b0d9e7f012a3f2c1b0d9e7f012a3f2c1b0d9e7f0"
 }
 ```
 

@@ -109,10 +109,10 @@ class TTSRequest(BaseModel):
     @field_validator("voice_checksum")
     @classmethod
     def validate_checksum_format(cls, v: str | None) -> str | None:
-        if v is not None and (
-            len(v) != 64 or not all(c in "0123456789abcdefABCDEF" for c in v)
-        ):
-            raise ValueError("voice_checksum must be a 64-character hex string (SHA-256)")
+        if v is not None:
+            v = v.lower()
+            if len(v) != 64 or not all(c in "0123456789abcdef" for c in v):
+                raise ValueError("voice_checksum must be a 64-character hex string (SHA-256)")
         return v
 
 
