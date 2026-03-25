@@ -3,15 +3,45 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import logging.handlers
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import numpy as np
 import soundfile as sf
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator
+
+
+def _configure_logging() -> None:
+    """Set up rotating file handler so all log output is captured to disk.
+
+    Writes to logs/tts_server.log (next to the repo root, capped at 10 MB,
+    keeping 5 rotated files). Console output is preserved alongside it.
+    """
+    log_dir = Path(__file__).parent.parent / "logs"
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / "tts_server.log"
+
+    fmt = logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    file_handler.setFormatter(fmt)
+    file_handler.setLevel(logging.DEBUG)
+
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    root.addHandler(file_handler)
+
+
+_configure_logging()
 
 from app.engine_chatterbox import ChatterboxEngine
 from app.engine_chatterbox_full import ChatterboxFullEngine
@@ -64,6 +94,31 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TTS Server", version="0.1.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    response = await call_next(request)
+    if response.status_code >= 400:
+        # Re-read the response body to log the error detail, then re-stream it.
+        body = b""
+        async for chunk in response.body_iterator:
+            body += chunk
+        logger.warning(
+            "%s %s -> %d | %s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            body.decode("utf-8", errors="replace"),
+        )
+        from fastapi.responses import Response as _Response
+        return _Response(
+            content=body,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type,
+        )
+    return response
 
 
 # ---------------------------------------------------------------------------

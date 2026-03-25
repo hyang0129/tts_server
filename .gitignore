@@ -34,3 +34,24 @@ voices/
 # OS
 .DS_Store
 Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Linter cache
+.ruff_cache/
+.mypy_cache/
+
+# Engine prompt caches (qwen3_prompt.pkl, blend pkls — regenerated on demand)
+*.pkl
+
+# Log files
+*.log
+
+# Downloaded model weights (HuggingFace safetensors, configs, etc.)
+models/
+
+# faster-higgs-audio dependency repo (cloned to D:/tmp but guard against local clones)
+faster-higgs-audio/

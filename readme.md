@@ -89,11 +89,25 @@ ANTHROPIC_API_KEY=sk-ant-...     # Optional, for LLM-adjudicated STT validation
 
 ### Run
 
-```bash
-cd /workspaces/hub_1/tts_server
-source /workspaces/.venvs/tts_server/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+**Windows (recommended):** Use `start_server.ps1` to launch as a native Windows process on port 8765.
+This avoids a VS Code issue where auto-port-forwarding intercepts WSL-spawned processes and makes
+the server unreachable from Windows tools (curl, browsers, other repos).
+
+```powershell
+# From a PowerShell terminal in the repo root:
+.\start_server.ps1
+
+# Optional params:
+.\start_server.ps1 -Port 8765 -VramMb 10000
 ```
+
+The script kills any existing instance, starts the server, and polls `/health` until ready.
+Logs go to `tts_server.log` / `tts_server_err.log`.
+
+**For Claude (bash tool):** `./start_server.sh` — calls the PowerShell script with the same behaviour.
+
+> **Do not** start the server with `uvicorn` directly from a bash/WSL shell — VS Code will
+> auto-forward the port and intercept connections, causing health checks to time out.
 
 ## Quick Start
 
