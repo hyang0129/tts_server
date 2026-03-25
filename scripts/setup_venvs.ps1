@@ -28,7 +28,7 @@ $Repo = Split-Path -Parent $PSScriptRoot
 # Detect Blackwell GPU (sm_12.x) - needs cu128 torch
 $IsBlackwell = $false
 try {
-    $cap = & nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>$null
+    $cap = (& nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>&1) | Out-String
     if ($cap -match "^12\.") { $IsBlackwell = $true }
 } catch {}
 

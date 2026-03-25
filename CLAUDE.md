@@ -57,16 +57,16 @@ set to the Base model — no override needed.
 
 ## Key commands
 ```bash
-# Run the server
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Run the server (Windows — native process, port 8765)
+./start_server.sh
 
-# Install tracked voice fixtures (run once after fresh clone/container rebuild)
-python tests/setup_test_voices.py
+# Install tracked voice fixtures (run once after fresh clone)
+.venv/Scripts/python tests/setup_test_voices.py
 
 # Lint
 ruff check .
 
-# Integration tests (requires running server on port 8000)
+# Integration tests (requires running server on port 8765)
 pytest tests/test_integration.py -v
 pytest tests/test_integration.py -v -k chatterbox
 pytest tests/test_integration.py -v -k higgs
