@@ -20,40 +20,35 @@ Consolidated FastAPI TTS server that serves multiple model backends (Chatterbox,
 
 ## Venv layout
 
-The host process and each engine run in separate isolated venvs:
+The host process and each engine run in separate isolated venvs (paths relative to repo root):
 
 | Venv | Path | Engines | Key constraint |
 |------|------|---------|----------------|
-| Host | `/workspaces/.venvs/tts_server/` | FastAPI server | fastapi, uvicorn, pydantic — no torch, no engine packages |
-| Chatterbox | `/workspaces/.venvs/tts_server-chatterbox/` | chatterbox, chatterbox_full | chatterbox-tts |
-| Higgs | `/workspaces/.venvs/tts_server-higgs/` | higgs | transformers<4.47.0 |
-| Qwen3 | `/workspaces/.venvs/tts_server-qwen3/` | qwen3 | transformers>=4.57.3 |
+| Host | `.venv\` | FastAPI server | fastapi, uvicorn, pydantic — no torch, no engine packages |
+| Chatterbox | `.venvs\chatterbox\` | chatterbox, chatterbox_full | chatterbox-tts |
+| Higgs | `.venvs\higgs\` | higgs | transformers<4.47.0 |
+| Qwen3 | `.venvs\qwen3\` | qwen3 | transformers>=4.57.3 |
 
-One-time setup to create all engine venvs:
+One-time setup to create all engine venvs (Windows):
 
-```bash
-# Run from repo root
-bash scripts/setup_venvs.sh
+```powershell
+# Run from repo root in PowerShell
+powershell -ExecutionPolicy Bypass -File scripts\setup_venvs.ps1
 ```
 
 ## Starting the server (agent instructions)
 
 The agent can and should start the server autonomously when needed (e.g. before running
-generate_artifacts.py or integration tests). Use the host venv (`/workspaces/.venvs/tts_server/`)
-to start the server — it contains fastapi and uvicorn. Each engine subprocess is launched in its
-own engine venv automatically by the model manager.
+generate_artifacts.py or integration tests). Use the host venv (`.venv\`) to start the server
+via `start_server.sh` — it contains fastapi and uvicorn. Each engine subprocess is launched in
+its own engine venv automatically by the model manager.
 
 ```bash
-# Start in background (recommended — server takes ~5s to become ready)
-# Note: uses the host venv, which contains fastapi/uvicorn only (no engine packages)
-AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/uvicorn app.main:app \
-    --host 0.0.0.0 --port 8000 > /tmp/tts_server.log 2>&1 &
+# Start via the wrapper script (recommended — runs as a native Windows process on port 8765)
+./start_server.sh
 
-# Wait for ready
-curl --retry 10 --retry-delay 2 --retry-connrefused -s http://localhost:8000/health
-
-# Install voice fixtures (required for named-voice tests — run once per fresh container)
-python tests/setup_test_voices.py
+# Install voice fixtures (required for named-voice tests — run once after setup)
+.venv/Scripts/python tests/setup_test_voices.py
 ```
 
 The `.env` file in the repo root is auto-loaded by the server; it contains `HF_TOKEN` and

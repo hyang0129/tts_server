@@ -23,14 +23,14 @@ class Qwen3Engine(SubprocessEngine):
     sample_rate = 24000
     estimated_vram_mb = ESTIMATED_VRAM_MB
     _worker_script = Path(__file__).parent.parent / "workers" / "qwen3_worker.py"
-    _worker_python = "/workspaces/.venvs/tts_server-qwen3/bin/python"
+    _worker_python = str(Path(__file__).parent.parent / ".venvs" / "qwen3" / "Scripts" / "python.exe")
 
     def _probe_deps(self) -> bool:
         logger.debug(f"Probing qwen3 deps at {self._worker_python!r}")
         try:
             result = _sp.run(
                 [self._worker_python, "-c", "import qwen_tts"],
-                capture_output=True, timeout=10
+                capture_output=True, timeout=30
             ).returncode == 0
         except Exception:
             result = False

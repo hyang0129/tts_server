@@ -69,6 +69,6 @@ for ($i = 0; $i -lt 20; $i++) {
 }
 
 if (-not $ready) {
-    Write-Host "Server did not become ready — check tts_server_err.log"
+    Write-Host "Server did not become ready - check tts_server_err.log"
     exit 1
 }

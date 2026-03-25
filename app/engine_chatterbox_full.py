@@ -14,14 +14,14 @@ class ChatterboxFullEngine(SubprocessEngine):
     sample_rate = 24000
     estimated_vram_mb = int(os.environ.get("CB_FULL_VRAM_MB", "4700"))
     _worker_script = Path(__file__).parent.parent / "workers" / "chatterbox_full_worker.py"
-    _worker_python = "/workspaces/.venvs/tts_server-chatterbox/bin/python"
+    _worker_python = str(Path(__file__).parent.parent / ".venvs" / "chatterbox" / "Scripts" / "python.exe")
 
     def _probe_deps(self) -> bool:
         logger.debug(f"Probing chatterbox_full deps: python={self._worker_python!r}")
         try:
             result = _sp.run(
                 [self._worker_python, "-c", "import chatterbox"],
-                capture_output=True, timeout=10
+                capture_output=True, timeout=30
             ).returncode == 0
         except Exception:
             result = False

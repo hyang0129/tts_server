@@ -23,7 +23,7 @@ class HiggsEngine(SubprocessEngine):
     sample_rate = 24000
     estimated_vram_mb = _VRAM_BY_QUANT.get(QUANTIZATION_BITS, 9000)
     _worker_script = Path(__file__).parent.parent / "workers" / "higgs_worker.py"
-    _worker_python = "/workspaces/.venvs/tts_server-higgs/bin/python"
+    _worker_python = str(Path(__file__).parent.parent / ".venvs" / "higgs" / "Scripts" / "python.exe")
 
     def _probe_deps(self) -> bool:
         logger.debug(f"Probing higgs deps at {self._worker_python!r}")
@@ -34,7 +34,7 @@ class HiggsEngine(SubprocessEngine):
         try:
             result = _sp.run(
                 [self._worker_python, "-c", probe],
-                capture_output=True, timeout=10
+                capture_output=True, timeout=30
             ).returncode == 0
         except Exception:
             result = False
