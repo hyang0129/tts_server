@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""Stdlib-only JSON protocol helpers for newline-delimited IPC over stdin/stdout."""
+"""Stdlib-only JSON protocol helpers for newline-delimited IPC over stdin/stdout.
+
+Protocol note: send() uses os.write(1, ...) directly on file descriptor 1 so that
+workers can safely redirect sys.stdout → sys.stderr to suppress library prints
+without breaking the IPC channel.
+"""
 from __future__ import annotations
 
 import json
+import os
 import sys
 import traceback
 
 
 def send(payload: dict) -> None:
-    """Write a JSON payload to stdout followed by a newline, then flush."""
-    sys.stdout.write(json.dumps(payload) + "\n")
-    sys.stdout.flush()
+    """Write a JSON payload to stdout (fd 1) followed by a newline."""
+    os.write(1, (json.dumps(payload) + "\n").encode())
 
 
 def send_ok(**payload) -> None:

@@ -93,6 +93,7 @@ class SubprocessEngine(TTSEngine):
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=None,  # inherit host stderr so worker logs go to server logs
+            limit=256 * 1024 * 1024,  # 256 MB — base64 audio can be large
         )
 
         # Send load command
@@ -134,14 +135,28 @@ class SubprocessEngine(TTSEngine):
         voice_ref_text: str | None,
         **params,
     ) -> tuple[np.ndarray, int]:
-        """Send generate command to worker."""
-        response = await self._send_command({
+        """Send generate command to worker. Retries once if worker crashes mid-generation."""
+        logger = logging.getLogger(__name__)
+        cmd = {
             "cmd": "generate",
             "text": text,
             "voice_ref_path": voice_ref_path,
             "voice_ref_text": voice_ref_text,
             "params": params,
-        })
+        }
+        try:
+            response = await self._send_command(cmd)
+        except RuntimeError as exc:
+            if "closed stdout unexpectedly" not in str(exc):
+                raise
+            # Worker crashed mid-generation (e.g. VRAM fragmentation after model swap).
+            # Clear state and reload before retrying once.
+            logger.warning("Worker %s crashed during generate — reloading and retrying", self.name)
+            self._proc = None
+            self._is_loaded = False
+            await self.load()
+            response = await self._send_command(cmd)
+
         audio = np.frombuffer(base64.b64decode(response["audio"]), dtype=np.float32)
         sample_rate = response.get("sample_rate", self.sample_rate)
         return audio, sample_rate

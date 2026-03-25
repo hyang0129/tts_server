@@ -23,6 +23,10 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+# Redirect sys.stdout → stderr so library prints don't corrupt the JSON-RPC pipe.
+# worker_protocol.send() uses os.write(1, ...) directly and is unaffected.
+sys.stdout = sys.stderr
+
 # Ensure the workers package is importable when the file is run directly.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -297,6 +301,41 @@ def _cmd_generate(req: dict) -> None:  # noqa: C901 — complexity from variant 
                 [{"audio_codes": c} for c in talker_codes]
             )
             audio = wavs[0]
+
+    elif _MODEL_VARIANT == "base":
+        # Base model without voice reference: unconditioned generation.
+        # generate_voice_design() is not supported on Base; use the low-level
+        # model.generate() path (same as instruct+voice_clone but no ref audio).
+        base_kwargs = dict(gen_kwargs)
+        if "temperature" not in base_kwargs:
+            base_kwargs["temperature"] = 0.5
+        if "max_new_tokens" not in base_kwargs:
+            word_count = len(text.split())
+            estimated_frames = int(word_count / _WPS * _CODEC_HZ)
+            base_kwargs["max_new_tokens"] = max(120, estimated_frames * 3)
+
+        input_ids = _model._tokenize_texts([_model._build_assistant_text(text)])
+        gen_kw = _model._merge_generate_kwargs(**base_kwargs)
+
+        instruct_ids_list = None
+        if instruct:
+            instruct_ids_list = [
+                _model._tokenize_texts([_model._build_instruct_text(instruct)])[0]
+            ]
+
+        talker_codes, _ = _model.model.generate(
+            input_ids=input_ids,
+            instruct_ids=instruct_ids_list,
+            ref_ids=None,
+            voice_clone_prompt=None,
+            languages=[language],
+            non_streaming_mode=True,
+            **gen_kw,
+        )
+        wavs, sr = _model.model.speech_tokenizer.decode(
+            [{"audio_codes": c} for c in talker_codes]
+        )
+        audio = wavs[0]
 
     elif _MODEL_VARIANT == "customvoice" or speaker is not None:
         # Preset speaker with optional instruct.

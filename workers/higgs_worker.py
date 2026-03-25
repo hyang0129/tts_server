@@ -18,6 +18,10 @@ import gc
 import os
 import sys
 
+# Redirect sys.stdout → stderr so library prints don't corrupt the JSON-RPC pipe.
+# worker_protocol.send() uses os.write(1, ...) directly and is unaffected.
+sys.stdout = sys.stderr
+
 # Ensure the workers package is importable when the file is run directly.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
