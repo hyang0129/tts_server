@@ -23,5 +23,5 @@ bitsandbytes
 # manipulation in the Higgs worker (see workers/higgs_worker.py and HIGGS_REPO_PATH
 # env var). The package exposes itself as boson_multimodal.
 # To set it up manually:
-#   git clone https://github.com/bosonai/faster-higgs-audio /tmp/faster-higgs-audio
+#   git clone https://github.com/sorbetstudio/faster-higgs-audio /tmp/faster-higgs-audio
 #   (no pip install needed — the worker adds it to sys.path at runtime)

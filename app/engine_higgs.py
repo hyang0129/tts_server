@@ -24,9 +24,13 @@ class HiggsEngine(SubprocessEngine):
     _worker_python = "/workspaces/.venvs/tts_server-higgs/bin/python"
 
     def _probe_deps(self) -> bool:
+        higgs_repo = os.environ.get("HIGGS_REPO_PATH", "/tmp/faster-higgs-audio")
+        probe = (
+            f"import sys; sys.path.insert(0, {higgs_repo!r}); import boson_multimodal"
+        )
         try:
             return _sp.run(
-                [self._worker_python, "-c", "import boson_multimodal"],
+                [self._worker_python, "-c", probe],
                 capture_output=True, timeout=10
             ).returncode == 0
         except Exception:

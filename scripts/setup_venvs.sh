@@ -21,6 +21,26 @@ PYTHON=python3.11
 VENVS_ROOT=/workspaces/.venvs
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# Detect Blackwell (sm_120) GPU via nvidia-smi (no torch required).
+IS_BLACKWELL=0
+if nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | grep -q "^12\."; then
+    IS_BLACKWELL=1
+fi
+
+# Helper: upgrade torch to cu128 wheel if Blackwell GPU is present.
+# All engine venvs need this because default pip torch pulls cu13 libs that
+# require CUDA 13.0+ drivers, but RTX 50-series runs CUDA 12.x drivers.
+install_blackwell_torch() {
+    local name=$1
+    if [ "$IS_BLACKWELL" = "1" ]; then
+        echo "[override] Blackwell GPU — installing torch==2.10.0 cu128 into '$name'..."
+        "$VENVS_ROOT/$name/bin/pip" install \
+            torch==2.10.0 torchaudio==2.10.0 \
+            --index-url https://download.pytorch.org/whl/cu128 --quiet
+        echo "[ok]   torch cu128 installed for $name"
+    fi
+}
+
 echo "==> tts_server venv setup"
 echo "    Repo root : $REPO_ROOT"
 echo "    Venvs root: $VENVS_ROOT"
@@ -69,15 +89,8 @@ echo ""
 echo "--- Chatterbox venv (tts_server-chatterbox) ---"
 create_venv tts_server-chatterbox
 install_reqs tts_server-chatterbox "$REPO_ROOT/requirements-chatterbox.txt"
-# Blackwell (RTX 50-series, sm_120) override: chatterbox-tts pins torch==2.6.0 which
-# doesn't support sm_120. Override with the cu128 wheel.
-if python3 -c "import torch; print(torch.cuda.get_device_capability())" 2>/dev/null | grep -q "(12,"; then
-    echo "[override] Blackwell GPU detected — upgrading torch to cu128 wheel"
-    "$VENVS_ROOT/tts_server-chatterbox/bin/pip" install \
-        torch==2.10.0 torchaudio==2.10.0 \
-        --index-url https://download.pytorch.org/whl/cu128
-    echo "[ok]   torch cu128 installed for chatterbox venv"
-fi
+# chatterbox-tts pins torch==2.6.0; Blackwell needs cu128 override.
+install_blackwell_torch tts_server-chatterbox
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -89,13 +102,14 @@ echo ""
 echo "--- Higgs venv (tts_server-higgs) ---"
 create_venv tts_server-higgs
 install_reqs tts_server-higgs "$REPO_ROOT/requirements-higgs.txt"
+install_blackwell_torch tts_server-higgs
 
 HIGGS_REPO_PATH="${HIGGS_REPO_PATH:-/tmp/faster-higgs-audio}"
 if [ -d "$HIGGS_REPO_PATH" ]; then
     echo "[skip] faster-higgs-audio repo already present at $HIGGS_REPO_PATH"
 else
     echo "[clone] Cloning faster-higgs-audio to $HIGGS_REPO_PATH"
-    git clone https://github.com/bosonai/faster-higgs-audio "$HIGGS_REPO_PATH"
+    git clone https://github.com/sorbetstudio/faster-higgs-audio "$HIGGS_REPO_PATH"
     echo "[ok]   Cloned to $HIGGS_REPO_PATH"
 fi
 echo ""
@@ -106,6 +120,7 @@ echo ""
 echo "--- Qwen3 venv (tts_server-qwen3) ---"
 create_venv tts_server-qwen3
 install_reqs tts_server-qwen3 "$REPO_ROOT/requirements-qwen3.txt"
+install_blackwell_torch tts_server-qwen3
 echo ""
 
 echo "==> All venvs ready."

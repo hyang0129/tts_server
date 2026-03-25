@@ -15,12 +15,17 @@ The server targets **one model in VRAM at a time**. Recommended VRAM budget is 1
 
 ## 2. Installation
 
+> **Note — legacy single-venv sections below (2.1–2.9):** The current setup uses
+> per-engine venvs managed by `scripts/setup_venvs.sh`. Skip to [section 2.10](#210-per-engine-venv-setup)
+> for the recommended path. Only sections 2.2 (host venv) and 2.4 (server package install)
+> are still required; the rest are kept for reference.
+
 ### 2.1 Clone faster-higgs-audio
 
 The Higgs engine depends on this repo and it is not available on PyPI.
 
 ```bash
-git clone https://github.com/bosonai/faster-higgs-audio /tmp/faster-higgs-audio
+git clone https://github.com/sorbetstudio/faster-higgs-audio /tmp/faster-higgs-audio
 ```
 
 ### 2.2 Create and activate the venv
