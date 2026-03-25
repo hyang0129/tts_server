@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import logging
 import logging.handlers
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -53,6 +55,7 @@ from app.voices import (
     VoiceListResponse,
     VoiceMetadata,
     VoiceStore,
+    _slugify,
 )
 
 logger = logging.getLogger(__name__)
@@ -265,7 +268,11 @@ async def synthesize(req: TTSRequest) -> Response:
             else:
                 voice_ref_path = str(voice_store.get_reference_path(req.voice))
         elif model_name == "chatterbox_full":
-            voice_ref_path = str(voice_store.get_reference_path(req.voice))
+            cond_path = voice_store.get_conditionals_path(req.voice)
+            if cond_path is not None:
+                conditionals_path = str(cond_path)
+            else:
+                voice_ref_path = str(voice_store.get_reference_path(req.voice))
         elif model_name == "qwen3":
             # Blended qwen3 voices have no reference.wav — their identity lives entirely
             # in qwen3_prompt.pkl.  We still pass the expected reference.wav path so the
@@ -299,6 +306,8 @@ async def synthesize(req: TTSRequest) -> Response:
             params["cfg_weight"] = req.cfg_weight
         if req.min_p is not None:
             params["min_p"] = req.min_p
+        if conditionals_path is not None:
+            params["conditionals_path"] = conditionals_path
     elif model_name == "higgs":
         if req.seed is not None:
             params["seed"] = req.seed
@@ -436,7 +445,7 @@ async def blend_voices(
     blend_config = {"voice_a": voice_a, "voice_b": voice_b, "texture_mix": texture_mix}
 
     if model == "qwen3":
-        # Qwen3 blending is pure tensor math — no model load required.
+        # Qwen3 blending runs through the subprocess worker.
         pkl_a = voice_store.get_qwen3_prompt_path(voice_a)
         pkl_b = voice_store.get_qwen3_prompt_path(voice_b)
         if pkl_a is None or pkl_b is None:
@@ -446,63 +455,118 @@ async def blend_voices(
                 detail=f"Voice '{missing}' has no Qwen3 prompt cache. "
                 "Make one synthesis request with that voice first to build the cache.",
             )
-        from app.engine_qwen3 import Qwen3Engine
 
-        alpha = texture_mix / 100.0
-        blended_item = Qwen3Engine.blend_voice_prompts(str(pkl_a), str(pkl_b), alpha)
+        voice_id = _slugify(name)
+        if voice_store.get_voice(voice_id) is not None:
+            raise HTTPException(409, detail=f"Voice already exists: {voice_id}")
+
+        voice_dir = voice_store._base_dir / voice_id
         try:
-            meta = voice_store.create_blended_qwen3_voice(
-                name=name,
-                prompt_item=blended_item,
-                blend_config=blend_config,
+            voice_dir.mkdir(parents=True, exist_ok=False)
+        except FileExistsError:
+            raise HTTPException(409, detail=f"Voice already exists: {voice_id}")
+
+        out_pkl_path = str(voice_dir / "qwen3_prompt.pkl")
+        alpha = texture_mix / 100.0
+
+        async with app.state.lock:
+            engine = await manager.ensure_loaded("qwen3")
+            await engine.blend_voice_prompts_ipc(
+                str(pkl_a), str(pkl_b), alpha, out_pkl_path=out_pkl_path
             )
-        except FileExistsError as exc:
-            raise HTTPException(409, detail=f"Voice already exists: {exc}")
+
+        sources = f"{voice_a}+{voice_b}"
+        meta = VoiceMetadata(
+            voice_id=voice_id,
+            name=name,
+            original_filename=f"blend:{sources}",
+            created_at=datetime.now(timezone.utc),
+            duration_s=0.0,
+            sample_rate=24000,
+            compatible_models=["qwen3"],
+        )
+        raw = json.loads(meta.model_dump_json())
+        raw["blend_config"] = blend_config
+        (voice_dir / "metadata.json").write_text(json.dumps(raw, indent=2))
+        voice_store._index[voice_id] = meta
+        logger.info("Created blended Qwen3 voice %r (id=%s)", name, voice_id)
         return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
 
     if model == "chatterbox_full":
         # --- chatterbox_full blend ---
+        voice_id = _slugify(name)
+        if voice_store.get_voice(voice_id) is not None:
+            raise HTTPException(409, detail=f"Voice already exists: {voice_id}")
+
+        voice_dir = voice_store._base_dir / voice_id
+        try:
+            voice_dir.mkdir(parents=True, exist_ok=False)
+        except FileExistsError:
+            raise HTTPException(409, detail=f"Voice already exists: {voice_id}")
+
         path_a = str(voice_store.get_reference_path(voice_a))
         path_b = str(voice_store.get_reference_path(voice_b))
+        out_pt_path = str(voice_dir / "conditionals.pt")
+
         async with app.state.lock:
             engine = await manager.ensure_loaded("chatterbox_full")
-            if not isinstance(engine, ChatterboxFullEngine):
+            if not hasattr(engine, "blend_voices"):
                 raise HTTPException(500, detail="Blend requires chatterbox_full engine")
-            blended = await engine.blend_voices(path_a, path_b, texture_mix)
-        try:
-            meta = voice_store.create_blended_voice(
-                name=name,
-                conditionals=blended,
-                blend_config=blend_config,
-                sample_rate=engine.sample_rate,
-                compatible_model="chatterbox_full",
-            )
-        except FileExistsError as exc:
-            raise HTTPException(409, detail=f"Voice already exists: {exc}")
+            await engine.blend_voices(path_a, path_b, texture_mix, out_pt_path=out_pt_path)
+
+        sources = f"{voice_a}+{voice_b}"
+        meta = VoiceMetadata(
+            voice_id=voice_id,
+            name=name,
+            original_filename=f"blend:{sources}",
+            created_at=datetime.now(timezone.utc),
+            duration_s=0.0,
+            sample_rate=engine.sample_rate,
+            compatible_models=["chatterbox_full"],
+        )
+        raw = json.loads(meta.model_dump_json())
+        raw["blend_config"] = blend_config
+        (voice_dir / "metadata.json").write_text(json.dumps(raw, indent=2))
+        voice_store._index[voice_id] = meta
+        logger.info("Created blended voice %r (id=%s)", name, voice_id)
         return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
 
     # --- chatterbox blend ---
+    voice_id = _slugify(name)
+    if voice_store.get_voice(voice_id) is not None:
+        raise HTTPException(409, detail=f"Voice already exists: {voice_id}")
+
+    voice_dir = voice_store._base_dir / voice_id
+    try:
+        voice_dir.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        raise HTTPException(409, detail=f"Voice already exists: {voice_id}")
+
     path_a = str(voice_store.get_reference_path(voice_a))
     path_b = str(voice_store.get_reference_path(voice_b))
+    out_pt_path = str(voice_dir / "conditionals.pt")
 
     async with app.state.lock:
         engine = await manager.ensure_loaded("chatterbox")
-        from app.engine_chatterbox import ChatterboxEngine
-
-        if not isinstance(engine, ChatterboxEngine):
+        if not hasattr(engine, "blend_voices"):
             raise HTTPException(500, detail="Blend requires chatterbox engine")
-        blended = await engine.blend_voices(path_a, path_b, texture_mix)
+        await engine.blend_voices(path_a, path_b, texture_mix, out_pt_path=out_pt_path)
 
-    try:
-        meta = voice_store.create_blended_voice(
-            name=name,
-            conditionals=blended,
-            blend_config=blend_config,
-            sample_rate=engine.sample_rate,
-        )
-    except FileExistsError as exc:
-        raise HTTPException(409, detail=f"Voice already exists: {exc}")
-
+    sources = f"{voice_a}+{voice_b}"
+    meta = VoiceMetadata(
+        voice_id=voice_id,
+        name=name,
+        original_filename=f"blend:{sources}",
+        created_at=datetime.now(timezone.utc),
+        duration_s=0.0,
+        sample_rate=engine.sample_rate,
+        compatible_models=["chatterbox"],
+    )
+    raw = json.loads(meta.model_dump_json())
+    raw["blend_config"] = blend_config
+    (voice_dir / "metadata.json").write_text(json.dumps(raw, indent=2))
+    voice_store._index[voice_id] = meta
+    logger.info("Created blended voice %r (id=%s)", name, voice_id)
     return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
 
 

@@ -15,6 +15,11 @@ The server targets **one model in VRAM at a time**. Recommended VRAM budget is 1
 
 ## 2. Installation
 
+> **Note — legacy single-venv sections below (2.1–2.9):** The current setup uses
+> per-engine venvs managed by `scripts/setup_venvs.sh`. Skip to [section 2.10](#210-per-engine-venv-setup)
+> for the recommended path. Only sections 2.2 (host venv) and 2.4 (server package install)
+> are still required; the rest are kept for reference.
+
 ### 2.1 Clone faster-higgs-audio
 
 The Higgs engine depends on this repo and it is not available on PyPI.
@@ -91,6 +96,48 @@ pip install faster-whisper anthropic
 
 ---
 
+## 2.10 Per-Engine Venv Setup
+
+### Why separate venvs are needed
+
+Each TTS engine requires a different version of `transformers` that conflicts with the others:
+
+- **Higgs** requires `transformers<4.47.0`
+- **Qwen3** requires `transformers>=4.57.3`
+- **Chatterbox** bundles its own torch pin
+
+These ranges cannot coexist in a single venv. The server therefore runs the FastAPI host process in a lightweight host venv and spawns each engine as a subprocess worker in its own isolated venv.
+
+### Venv layout
+
+| Venv | Path | Engines | Key constraint |
+|------|------|---------|----------------|
+| Host | `/workspaces/.venvs/tts_server/` | FastAPI server | fastapi, uvicorn, pydantic — no torch, no engine packages |
+| Chatterbox | `/workspaces/.venvs/tts_server-chatterbox/` | chatterbox, chatterbox_full | chatterbox-tts |
+| Higgs | `/workspaces/.venvs/tts_server-higgs/` | higgs | transformers<4.47.0 |
+| Qwen3 | `/workspaces/.venvs/tts_server-qwen3/` | qwen3 | transformers>=4.57.3 |
+
+### Creating all engine venvs
+
+Run once from the repo root after a fresh clone or container rebuild:
+
+```bash
+bash scripts/setup_venvs.sh
+```
+
+This script creates and populates each engine venv. The host venv (`/workspaces/.venvs/tts_server/`) must already exist (created in step 2.2) — the script only creates the engine venvs.
+
+### Starting the server
+
+Always start the server using the host venv. The model manager automatically selects the correct engine venv when launching a subprocess worker.
+
+```bash
+AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/uvicorn app.main:app \
+    --host 0.0.0.0 --port 8000
+```
+
+---
+
 ## 3. Known Dependency Conflicts
 
 ### 3.1 chatterbox-tts pins torch==2.6.0 (no sm_120 support)
@@ -149,10 +196,12 @@ Additional variables (optional, defaults shown):
 
 ## 5. Running the Server
 
+The server is started using the **host venv** (`/workspaces/.venvs/tts_server/`), which contains only fastapi and uvicorn. Engine subprocess workers are launched in their own venvs automatically.
+
 ```bash
-cd /workspaces/hub_1/tts_server
-source /workspaces/.venvs/tts_server/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+cd /workspaces/hub_3/tts_server
+AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/uvicorn app.main:app \
+    --host 0.0.0.0 --port 8000
 ```
 
 Models are lazy-loaded on first request. Startup is fast; the first `/tts` call will take 3–21 seconds while the model loads into VRAM.

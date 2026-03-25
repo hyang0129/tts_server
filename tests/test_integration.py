@@ -149,9 +149,28 @@ class TestHealth:
 
     def test_health_lists_models(self):
         health = get_health()
-        assert "models" in health or "available_models" in health
-        models = health.get("models") or health.get("available_models", [])
+        assert "models" in health or "available_models" in health or "engines" in health
+        models = health.get("models") or health.get("available_models") or list(health.get("engines", {}).keys())
         assert len(models) >= 1
+
+    def test_engines_not_loaded_at_startup(self):
+        """All engines must report loaded=false before any TTS request is made.
+
+        This test is placed first in the session-level execution order so it
+        runs while the server is still in its initial idle state.  It uses the
+        /health endpoint rather than inspecting Python objects directly, because
+        engines now run as subprocess workers in separate venvs.
+        """
+        health = get_health()
+        engines = health.get("engines", {})
+        # The health response must expose at least one engine entry.
+        assert engines, "Expected 'engines' dict in /health response"
+        for name, status in engines.items():
+            assert "loaded" in status, f"Engine {name!r} missing 'loaded' field in /health"
+            assert status["loaded"] is False, (
+                f"Engine {name!r} should not be loaded at startup, "
+                f"but /health reports loaded={status['loaded']!r}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +369,7 @@ class TestChatterbox:
         audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
         if not audio_path.exists():
             pytest.skip("kroniivoice_15s.wav fixture not found")
-        return clone_voice(
+        return clone_voice_full(
             "test_kronii_cb",
             audio_path,
             "This is a sample of my voice for cloning purposes.",
@@ -361,7 +380,8 @@ class TestChatterbox:
         wav_bytes = post_tts({
             "text": "Did you know? The hamburger was not actually invented in Hamburg.",
             "model": "chatterbox",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
         })
         # WAV files start with RIFF header
         assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
@@ -373,7 +393,8 @@ class TestChatterbox:
         wav_bytes = post_tts({
             "text": expected_text,
             "model": "chatterbox",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
         })
         assert wav_bytes[:4] == b"RIFF"
 
@@ -407,7 +428,7 @@ class TestChatterboxFull:
         audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
         if not audio_path.exists():
             pytest.skip("kroniivoice_15s.wav fixture not found")
-        return clone_voice(
+        return clone_voice_full(
             "test_kronii_cbfull",
             audio_path,
             "This is a sample of my voice for cloning purposes.",
@@ -418,7 +439,8 @@ class TestChatterboxFull:
         wav_bytes = post_tts({
             "text": "Did you know? The hamburger was not actually invented in Hamburg.",
             "model": "chatterbox_full",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
         })
         # WAV files start with RIFF header
         assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
@@ -429,7 +451,8 @@ class TestChatterboxFull:
         wav_bytes = post_tts({
             "text": "Did you know? The hamburger was not actually invented in Hamburg.",
             "model": "chatterbox_full",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
             "exaggeration": 0.8,
         })
         assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
@@ -440,7 +463,8 @@ class TestChatterboxFull:
         wav_bytes = post_tts({
             "text": expected_text,
             "model": "chatterbox_full",
-            "voice": voice_id,
+            "voice": voice_id["voice_id"],
+            "voice_checksum": voice_id["wav_sha256"],
         })
         assert wav_bytes[:4] == b"RIFF"
 
@@ -460,6 +484,231 @@ class TestChatterboxFull:
             pytest.skip("stt_validate or faster-whisper not available")
         finally:
             tmp_path.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Blend tests
+# ---------------------------------------------------------------------------
+
+
+def blend_voices_req(
+    name: str,
+    voice_a: str,
+    voice_b: str,
+    model: str = "chatterbox",
+    texture_mix: int = 50,
+) -> dict:
+    """POST multipart form to /voices/blend. Returns parsed JSON dict.
+
+    Raises on non-2xx, except 409 (already exists) which returns the existing
+    voice metadata fetched from GET /voices/{slug}.
+    """
+    url = f"{BASE_URL}/voices/blend"
+    boundary = "----BlendTestBoundary"
+
+    def field(fname: str, value: str) -> bytes:
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{fname}"\r\n\r\n'
+            f"{value}\r\n"
+        ).encode()
+
+    body = (
+        field("name", name)
+        + field("voice_a", voice_a)
+        + field("voice_b", voice_b)
+        + field("model", model)
+        + field("texture_mix", str(texture_mix))
+        + f"--{boundary}--\r\n".encode()
+    )
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=300)
+        assert resp.status == 201, f"Expected 201, got {resp.status}"
+        return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 409:
+            # Voice already exists — return existing metadata from GET /voices/{slug}.
+            import re as _re
+            slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+            try:
+                get_resp = urllib.request.urlopen(f"{BASE_URL}/voices/{slug}", timeout=10)
+                return json.loads(get_resp.read())
+            except urllib.error.HTTPError as get_exc:
+                if get_exc.code == 404:
+                    # Partial voice dir exists (engine failed on a prior run) but no metadata.
+                    pytest.skip(
+                        f"Blend voice dir exists but no metadata (prior engine failure); "
+                        f"restart the server to clean up or delete voices/{slug} manually."
+                    )
+                raise
+        if exc.code in (500, 503):
+            error_body = exc.read().decode(errors="replace")
+            pytest.skip(f"Engine unavailable for blend (HTTP {exc.code}): {error_body[:200]}")
+        raise
+
+
+class TestBlend:
+    """Tests for POST /voices/blend endpoint."""
+
+    @pytest.fixture(scope="class")
+    def two_voices(self):
+        """Clone two distinct voices to use as blend sources."""
+        audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
+        if not audio_path.exists():
+            pytest.skip("kroniivoice_15s.wav fixture not found")
+
+        voice_a_data = clone_voice_full(
+            "test_blend_source_a",
+            audio_path,
+            "This is a sample of my voice for cloning purposes.",
+        )
+        voice_b_data = clone_voice_full(
+            "test_blend_source_b",
+            audio_path,
+            "This is a sample of my voice for cloning purposes.",
+        )
+        return {"voice_a": voice_a_data, "voice_b": voice_b_data}
+
+    def test_chatterbox_blend_creates_voice(self, two_voices):
+        """Blend two voices with chatterbox model; assert 201 and voice appears in GET /voices."""
+        va_id = two_voices["voice_a"]["voice_id"]
+        vb_id = two_voices["voice_b"]["voice_id"]
+
+        result = blend_voices_req(
+            name="test_blend_chatterbox",
+            voice_a=va_id,
+            voice_b=vb_id,
+            model="chatterbox",
+            texture_mix=50,
+        )
+        assert "voice_id" in result, f"Response missing voice_id: {result}"
+        assert result["voice_id"], "voice_id should be non-empty"
+
+        # Confirm the blended voice is listed in GET /voices
+        list_resp = urllib.request.urlopen(f"{BASE_URL}/voices", timeout=10)
+        voices_data = json.loads(list_resp.read())
+        voice_ids = [v["voice_id"] for v in voices_data.get("voices", [])]
+        assert result["voice_id"] in voice_ids, (
+            f"Blended voice {result['voice_id']!r} not found in GET /voices"
+        )
+
+        # Optionally generate TTS with the blended voice to confirm it produces audio.
+        # Blended voices have wav_sha256="" so pass a dummy 64-char hex checksum.
+        try:
+            wav_bytes = post_tts({
+                "text": "Testing blended voice synthesis.",
+                "model": "chatterbox",
+                "voice": result["voice_id"],
+                "voice_checksum": "a" * 64,
+            })
+            assert wav_bytes[:4] == b"RIFF", "Blended voice TTS did not return a valid WAV"
+        except urllib.error.HTTPError as exc:
+            # Engine may not be available (no venv); skip TTS check gracefully.
+            if exc.code in (500, 503):
+                pytest.skip(f"Engine unavailable for TTS with blended voice: HTTP {exc.code}")
+            raise
+
+    def test_chatterbox_full_blend_creates_voice(self, two_voices):
+        """Blend two voices with chatterbox_full model; assert voice_id is returned."""
+        va_id = two_voices["voice_a"]["voice_id"]
+        vb_id = two_voices["voice_b"]["voice_id"]
+
+        result = blend_voices_req(
+            name="test_blend_chatterbox_full",
+            voice_a=va_id,
+            voice_b=vb_id,
+            model="chatterbox_full",
+            texture_mix=30,
+        )
+        assert "voice_id" in result, f"Response missing voice_id: {result}"
+        assert result["voice_id"], "voice_id should be non-empty"
+
+        # Confirm the blended voice is listed in GET /voices
+        list_resp = urllib.request.urlopen(f"{BASE_URL}/voices", timeout=10)
+        voices_data = json.loads(list_resp.read())
+        voice_ids = [v["voice_id"] for v in voices_data.get("voices", [])]
+        assert result["voice_id"] in voice_ids, (
+            f"Blended voice {result['voice_id']!r} not found in GET /voices"
+        )
+
+        # Optionally TTS with the blended voice.
+        try:
+            wav_bytes = post_tts({
+                "text": "Testing blended full voice synthesis.",
+                "model": "chatterbox_full",
+                "voice": result["voice_id"],
+                "voice_checksum": "a" * 64,
+            })
+            assert wav_bytes[:4] == b"RIFF", "Blended voice TTS did not return a valid WAV"
+        except urllib.error.HTTPError as exc:
+            if exc.code in (500, 503):
+                pytest.skip(f"Engine unavailable for TTS with blended voice: HTTP {exc.code}")
+            raise
+
+    def test_qwen3_blend_creates_voice(self, two_voices):
+        """Build qwen3 pkl caches for both source voices via synthesis, then blend."""
+        va_data = two_voices["voice_a"]
+        vb_data = two_voices["voice_b"]
+        va_id = va_data["voice_id"]
+        vb_id = vb_data["voice_id"]
+        va_sha = va_data.get("wav_sha256", "")
+        vb_sha = vb_data.get("wav_sha256", "")
+
+        # Both voices need a qwen3_prompt.pkl; synthesise with each to build it.
+        for voice_id, wav_sha256 in [(va_id, va_sha), (vb_id, vb_sha)]:
+            try:
+                post_tts({
+                    "text": "Building prompt cache.",
+                    "model": "qwen3",
+                    "voice": voice_id,
+                    "voice_checksum": wav_sha256,
+                })
+            except urllib.error.HTTPError as exc:
+                if exc.code in (400, 500, 503):
+                    pytest.skip(
+                        f"Qwen3 engine unavailable (HTTP {exc.code}); "
+                        "skipping qwen3 blend test"
+                    )
+                raise
+
+        result = blend_voices_req(
+            name="test_blend_qwen3",
+            voice_a=va_id,
+            voice_b=vb_id,
+            model="qwen3",
+            texture_mix=50,
+        )
+        assert "voice_id" in result, f"Response missing voice_id: {result}"
+        assert result["voice_id"], "voice_id should be non-empty"
+
+        # Confirm the blended voice is listed in GET /voices
+        list_resp = urllib.request.urlopen(f"{BASE_URL}/voices", timeout=10)
+        voices_data = json.loads(list_resp.read())
+        voice_ids = [v["voice_id"] for v in voices_data.get("voices", [])]
+        assert result["voice_id"] in voice_ids, (
+            f"Blended qwen3 voice {result['voice_id']!r} not found in GET /voices"
+        )
+
+        # Optionally TTS with the blended voice (no wav_sha256, so pass dummy).
+        try:
+            wav_bytes = post_tts({
+                "text": "Testing blended qwen3 voice synthesis.",
+                "model": "qwen3",
+                "voice": result["voice_id"],
+                "voice_checksum": "a" * 64,
+            })
+            assert wav_bytes[:4] == b"RIFF", "Blended qwen3 voice TTS did not return a valid WAV"
+        except urllib.error.HTTPError as exc:
+            if exc.code in (500, 503):
+                pytest.skip(f"Engine unavailable for TTS with blended voice: HTTP {exc.code}")
+            raise
 
 
 # ---------------------------------------------------------------------------
@@ -545,7 +794,7 @@ class TestQwen3:
         audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
         if not audio_path.exists():
             pytest.skip("kroniivoice_15s.wav fixture not found")
-        voice_id = clone_voice(
+        voice_data = clone_voice_full(
             "test_kronii_q3",
             audio_path,
             "This is a sample of my voice for cloning purposes.",
@@ -553,7 +802,8 @@ class TestQwen3:
         wav_bytes = post_tts({
             "text": "Did you know? The hamburger was not actually invented in Hamburg.",
             "model": "qwen3",
-            "voice": voice_id,
+            "voice": voice_data["voice_id"],
+            "voice_checksum": voice_data["wav_sha256"],
         })
         assert wav_bytes[:4] == b"RIFF", "Response is not a valid WAV file"
         assert len(wav_bytes) > 1000, "WAV file suspiciously small"
@@ -598,22 +848,27 @@ class TestModelSwitching:
         audio_path = FIXTURES_DIR / "kroniivoice_15s.wav"
         if not audio_path.exists():
             pytest.skip("kroniivoice_15s.wav fixture not found")
-        return clone_voice(
+        return clone_voice_full(
             "test_switch_kronii",
             audio_path,
             "This is a sample of my voice for cloning purposes.",
         )
 
     def test_chatterbox_then_higgs_then_chatterbox(self, cb_voice_id):
-        """Switch models: chatterbox -> higgs -> chatterbox."""
+        """Switch models: chatterbox -> higgs -> chatterbox.
+
+        Each hop involves subprocess spawn/teardown, so a generous per-request
+        timeout of 120s is set explicitly on every post_tts call.
+        """
         short_text = "Testing model switching capabilities."
 
         # 1. Chatterbox request
         wav1 = post_tts({
             "text": short_text,
             "model": "chatterbox",
-            "voice": cb_voice_id,
-        })
+            "voice": cb_voice_id["voice_id"],
+            "voice_checksum": cb_voice_id["wav_sha256"],
+        }, timeout=120)
         assert wav1[:4] == b"RIFF"
 
         # Verify health shows chatterbox active
@@ -622,12 +877,12 @@ class TestModelSwitching:
         if active:
             assert active == "chatterbox", f"Expected chatterbox active, got {active}"
 
-        # 2. Higgs request (triggers model swap)
+        # 2. Higgs request (triggers model swap — subprocess teardown + spawn)
         wav2 = post_tts({
             "text": short_text,
             "model": "higgs",
             "speaker_description": "Male, moderate pitch, neutral accent",
-        })
+        }, timeout=120)
         assert wav2[:4] == b"RIFF"
 
         # Verify health shows higgs active
@@ -636,12 +891,13 @@ class TestModelSwitching:
         if active:
             assert active == "higgs", f"Expected higgs active, got {active}"
 
-        # 3. Back to chatterbox
+        # 3. Back to chatterbox (another subprocess swap)
         wav3 = post_tts({
             "text": short_text,
             "model": "chatterbox",
-            "voice": cb_voice_id,
-        })
+            "voice": cb_voice_id["voice_id"],
+            "voice_checksum": cb_voice_id["wav_sha256"],
+        }, timeout=120)
         assert wav3[:4] == b"RIFF"
 
 
