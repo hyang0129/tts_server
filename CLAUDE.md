@@ -96,7 +96,7 @@ already-installed voices are skipped.
 | Voice ID | Model | Description |
 |----------|-------|-------------|
 | `higgs-sable` | higgs | Sable, Keeper of the Akashic Archives persona voice. Measured, dry female narrator with quiet authority. WAV sourced from `config/personas/akashic_archives/voice_ref.wav` in video_agent_long (sha256: 2e0563b2…). Used by `test_higgs_drift_integration.py` to reproduce voice identity drift from video_agent_long#158. |
-| `ragnar-narrator` | higgs, chatterbox, chatterbox_full, qwen3 | Alias for the same WAV as `higgs-sable` (identical bytes). Kept for backward compatibility with video_agent_long integration tests. See video_agent_long#TBD for migration to `higgs-sable`. |
+| `ragnar-narrator` | higgs, chatterbox, chatterbox_full, qwen3 | Alias for the same WAV as `higgs-sable` (identical bytes). Kept for backward compatibility with video_agent_long integration tests. See video_agent_long#183 for migration to `higgs-sable`. |
 
 ### Adding a new fixture voice
 
