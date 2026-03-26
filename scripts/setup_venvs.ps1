@@ -17,7 +17,7 @@
 #   NVIDIA GPU (Blackwell/sm_12x auto-detected for cu128 torch override)
 
 param(
-    [string]$HiggsRepoPath = "D:\tmp\faster-higgs-audio"
+    [string]$HiggsRepoPath = "$env:USERPROFILE\tmp\faster-higgs-audio"
 )
 
 Set-StrictMode -Version Latest
@@ -142,7 +142,7 @@ Write-Host "--- Results ---"
 $anyFailed = $false
 foreach ($job in $jobs) {
     $out = Receive-Job -Job $job 2>&1
-    if ($job.State -eq 'Failed' -or ($out -match 'ERROR' -and $out -notmatch 'To modify pip')) {
+    if ($job.State -eq 'Failed' -or ($out | Where-Object { $_ -match 'ERROR' -and $_ -notmatch 'To modify pip' }).Count -gt 0) {
         Write-Host "[FAIL] $($job.Name)"
         $out | Where-Object { $_ -match 'ERROR|error' -and $_ -notmatch 'To modify pip' } | ForEach-Object { Write-Host "  $_" }
         $anyFailed = $true

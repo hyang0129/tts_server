@@ -27,7 +27,9 @@ class HiggsEngine(SubprocessEngine):
 
     def _probe_deps(self) -> bool:
         logger.debug(f"Probing higgs deps at {self._worker_python!r}")
-        higgs_repo = os.environ.get("HIGGS_REPO_PATH", "/tmp/faster-higgs-audio")
+        higgs_repo = os.environ.get("HIGGS_REPO_PATH") or os.path.join(
+            os.environ.get("USERPROFILE", r"C:\Users\Default"), "tmp", "faster-higgs-audio"
+        )
         probe = (
             f"import sys; sys.path.insert(0, {higgs_repo!r}); import boson_multimodal"
         )

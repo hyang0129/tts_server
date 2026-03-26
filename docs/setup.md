@@ -25,7 +25,7 @@ The server targets **one model in VRAM at a time**. Recommended VRAM budget is 1
 The Higgs engine depends on this repo and it is not available on PyPI.
 
 ```bash
-git clone https://github.com/sorbetstudio/faster-higgs-audio /tmp/faster-higgs-audio
+git clone https://github.com/sorbetstudio/faster-higgs-audio %USERPROFILE%\tmp\faster-higgs-audio
 ```
 
 ### 2.2 Create and activate the venv
@@ -73,7 +73,7 @@ This overrides the chatterbox pin. chatterbox-tts itself runs correctly on torch
 ### 2.7 Install faster-higgs-audio
 
 ```bash
-pip install -e /tmp/faster-higgs-audio
+pip install -e %USERPROFILE%\tmp\faster-higgs-audio
 ```
 
 ### 2.8 Install Higgs runtime dependencies
@@ -184,7 +184,7 @@ AVAILABLE_VRAM_MB=10000
 HIGGS_QUANT_BITS=8
 
 # Path to the cloned faster-higgs-audio repo (step 2.1).
-HIGGS_REPO_PATH=/tmp/faster-higgs-audio
+HIGGS_REPO_PATH=%USERPROFILE%\tmp\faster-higgs-audio
 
 # HuggingFace model and tokenizer IDs for Higgs Audio v2.
 HIGGS_MODEL_ID=bosonai/higgs-audio-v2-generation-3B-base
