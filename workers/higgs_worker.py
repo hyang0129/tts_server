@@ -47,7 +47,13 @@ else:
 # Attention implementation: "flash_attention_2" (default), "sdpa", or "eager".
 # "flash_attention_2" requires flash_attn (installed by scripts/setup_venvs.sh).
 # "sdpa" uses torch's built-in scaled_dot_product_attention — no extra packages.
+_VALID_ATTN_IMPLS = {"flash_attention_2", "sdpa", "eager"}
 ATTN_IMPL = os.environ.get("HIGGS_ATTN_IMPL", "flash_attention_2").strip().lower()
+if ATTN_IMPL not in _VALID_ATTN_IMPLS:
+    raise ValueError(
+        f"HIGGS_ATTN_IMPL={ATTN_IMPL!r} is not valid. "
+        f"Must be one of: {', '.join(sorted(_VALID_ATTN_IMPLS))}"
+    )
 
 DEFAULT_SCENE = "Audio is recorded from a quiet room."
 
