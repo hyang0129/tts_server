@@ -145,11 +145,7 @@ class ModelManager:
                     elapsed = time.monotonic() - self._last_request_time
                     logger.debug(f"Idle monitor: engine={self._active_engine}, idle_s={elapsed:.1f}")
                     if elapsed > IDLE_TIMEOUT_S:
-                        logger.info(
-                            "Engine %s idle for %.0fs, unloading",
-                            self._active_engine,
-                            elapsed,
-                        )
+                        logger.info(f"Engine {self._active_engine} idle for {elapsed:.0f}s, unloading")
                         await self._unload_current()
         except asyncio.CancelledError:
             return

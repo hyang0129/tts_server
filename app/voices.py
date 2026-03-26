@@ -155,7 +155,7 @@ class VoiceStore:
                 meta = VoiceMetadata(**raw)
                 self._index[meta.voice_id] = meta
             except Exception:
-                logger.warning("Skipping corrupt voice metadata: %s", meta_path)
+                logger.warning(f"Skipping corrupt voice metadata: {meta_path}")
         logger.debug(f"Loaded {len(self._index)} voice(s) from disk")
 
     def list_voices(self, model: str | None = None) -> list[VoiceMetadata]:
@@ -250,7 +250,7 @@ class VoiceStore:
         meta_path.write_text(meta.model_dump_json(indent=2))
 
         self._index[voice_id] = meta
-        logger.info("Registered voice %r (id=%s, %.1fs)", name, voice_id, duration_s)
+        logger.info(f"Registered voice {name!r} (id={voice_id}, {duration_s:.1f}s)")
         return meta
 
     def create_blended_voice(
@@ -286,7 +286,7 @@ class VoiceStore:
         meta_path.write_text(json.dumps(raw, indent=2))
 
         self._index[voice_id] = meta
-        logger.info("Created blended voice %r (id=%s)", name, voice_id)
+        logger.info(f"Created blended voice {name!r} (id={voice_id})")
         return meta
 
     def create_blended_qwen3_voice(
@@ -332,7 +332,7 @@ class VoiceStore:
         (voice_dir / "metadata.json").write_text(json.dumps(raw, indent=2))
 
         self._index[voice_id] = meta
-        logger.info("Created blended Qwen3 voice %r (id=%s)", name, voice_id)
+        logger.info(f"Created blended Qwen3 voice {name!r} (id={voice_id})")
         return meta
 
     def update_wpm(self, voice_id: str, wpm: float) -> None:
@@ -350,5 +350,5 @@ class VoiceStore:
         voice_dir = self._base_dir / voice_id
         shutil.rmtree(voice_dir, ignore_errors=True)
         del self._index[voice_id]
-        logger.info("Deleted voice %s", voice_id)
+        logger.info(f"Deleted voice {voice_id}")
         return True
