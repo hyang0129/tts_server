@@ -17,6 +17,7 @@ import base64
 import gc
 import os
 import sys
+import tempfile
 
 # Redirect sys.stdout → stderr so library prints don't corrupt the JSON-RPC pipe.
 # worker_protocol.send() uses os.write(1, ...) directly and is unaffected.
@@ -168,25 +169,54 @@ def _cmd_generate(req: dict) -> None:
             )
         )
 
-    effective_ras = ras_win_len if ras_win_len and ras_win_len > 0 else 0
+    continuation_audio_base64: str | None = params.get("continuation_audio_base64")
+    continuation_audio_text: str | None = params.get("continuation_audio_text")
 
-    original_max = _client._max_new_tokens
-    _client._max_new_tokens = max_new_tokens
+    _continuation_tmp_path: str | None = None
     try:
-        waveform, sr, _text_output = _client.generate(
-            messages=messages,
-            audio_ids=audio_ids,
-            chunked_text=[text],
-            generation_chunk_buffer_size=None,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            ras_win_len=effective_ras,
-            ras_win_max_num_repeat=ras_win_max_num_repeat,
-            seed=seed if seed is not None else 0,
-        )
+        if continuation_audio_base64 and continuation_audio_text:
+            raw_bytes = base64.b64decode(continuation_audio_base64, validate=True)
+            tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+            _continuation_tmp_path = tmp.name  # set before write so finally can clean up
+            tmp.write(raw_bytes)
+            tmp.flush()
+            tmp.close()
+
+            cont_tokens = _audio_tokenizer.encode(_continuation_tmp_path)
+            audio_ids.append(cont_tokens)
+            messages.append(Message(role="user", content=continuation_audio_text))
+            messages.append(
+                Message(
+                    role="assistant",
+                    content=AudioContent(audio_url=_continuation_tmp_path),
+                )
+            )
+
+        effective_ras = ras_win_len if ras_win_len and ras_win_len > 0 else 0
+
+        original_max = _client._max_new_tokens
+        _client._max_new_tokens = max_new_tokens
+        try:
+            waveform, sr, _text_output = _client.generate(
+                messages=messages,
+                audio_ids=audio_ids,
+                chunked_text=[text],
+                generation_chunk_buffer_size=None,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                ras_win_len=effective_ras,
+                ras_win_max_num_repeat=ras_win_max_num_repeat,
+                seed=seed if seed is not None else 0,
+            )
+        finally:
+            _client._max_new_tokens = original_max
     finally:
-        _client._max_new_tokens = original_max
+        if _continuation_tmp_path is not None:
+            try:
+                os.unlink(_continuation_tmp_path)
+            except OSError:
+                pass
 
     if waveform is None:
         raise RuntimeError("Higgs model returned no audio output")
