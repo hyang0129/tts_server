@@ -1,9 +1,9 @@
 # tts-server uses separate per-engine venvs to avoid transformers version conflicts:
-#   /workspaces/.venvs/tts_server          — host (FastAPI server only, listed below)
-#   /workspaces/.venvs/tts_server-chatterbox — requirements-chatterbox.txt
-#   /workspaces/.venvs/tts_server-higgs    — requirements-higgs.txt (transformers<4.47.0)
-#   /workspaces/.venvs/tts_server-qwen3    — requirements-qwen3.txt (transformers>=4.57.3)
-# Run `bash scripts/setup_venvs.sh` to create and populate all venvs.
+#   .venv\               — host (FastAPI server only, deps listed below)
+#   .venvs\chatterbox\   — requirements-chatterbox.txt
+#   .venvs\higgs\        — requirements-higgs.txt (transformers<4.47.0)
+#   .venvs\qwen3\        — requirements-qwen3.txt (transformers>=4.57.3)
+# Run `powershell -ExecutionPolicy Bypass -File scripts\setup_venvs.ps1` to create all venvs.
 
 [project]
 name = "tts-server"
@@ -18,6 +18,12 @@ dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
 ]
+
+[project.scripts]
+tts-server = "app.cli:serve"
+
+[tool.setuptools.packages.find]
+include = ["app*", "workers*"]
 
 [tool.ruff]
 line-length = 100
