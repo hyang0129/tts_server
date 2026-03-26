@@ -18,6 +18,9 @@ dacite
 pandas
 pydub
 bitsandbytes
+# flash-attn is installed separately in scripts/setup_venvs.sh via
+#   pip install flash-attn --no-build-isolation
+# (requires torch already present to compile the CUDA extension).
 # faster-higgs-audio is NOT available on PyPI.
 # It is installed from the cloned repo at /tmp/faster-higgs-audio via sys.path
 # manipulation in the Higgs worker (see workers/higgs_worker.py and HIGGS_REPO_PATH

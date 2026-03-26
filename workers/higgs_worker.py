@@ -44,10 +44,10 @@ if _raw_quant in ("0", "none", "false", "off"):
 else:
     QUANTIZATION_BITS = int(_raw_quant)
 
-# Attention implementation: "sdpa" (default), "flash_attention_2", or "eager".
-# "sdpa" uses torch's built-in scaled_dot_product_attention — faster than eager
-# with no extra packages. "flash_attention_2" requires flash_attn to be installed.
-ATTN_IMPL = os.environ.get("HIGGS_ATTN_IMPL", "sdpa").strip().lower()
+# Attention implementation: "flash_attention_2" (default), "sdpa", or "eager".
+# "flash_attention_2" requires flash_attn (installed by scripts/setup_venvs.sh).
+# "sdpa" uses torch's built-in scaled_dot_product_attention — no extra packages.
+ATTN_IMPL = os.environ.get("HIGGS_ATTN_IMPL", "flash_attention_2").strip().lower()
 
 DEFAULT_SCENE = "Audio is recorded from a quiet room."
 
