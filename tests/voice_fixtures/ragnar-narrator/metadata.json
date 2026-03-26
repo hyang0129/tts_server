@@ -1,0 +1,15 @@
+{
+  "voice_id": "ragnar-narrator",
+  "name": "ragnar-narrator",
+  "original_filename": "ragnar_voice_ref.wav",
+  "created_at": "2026-03-20T21:03:14.959262Z",
+  "duration_s": 8.32,
+  "sample_rate": 24000,
+  "wpm": null,
+  "compatible_models": [
+    "chatterbox",
+    "chatterbox_full",
+    "higgs",
+    "qwen3"
+  ]
+}
