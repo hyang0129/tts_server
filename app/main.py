@@ -16,7 +16,7 @@ import soundfile as sf
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.engine_chatterbox import ChatterboxEngine
 from app.engine_chatterbox_full import ChatterboxFullEngine
@@ -145,6 +145,8 @@ class TTSRequest(BaseModel):
     ras_win_len: int | None = None
     ras_win_max_num_repeat: int | None = None
     force_audio_gen: bool | None = None
+    continuation_audio_base64: str | None = None  # base64-encoded WAV, 24 kHz mono
+    continuation_audio_text: str | None = None    # transcript of continuation audio (required if audio provided)
     # Qwen3-specific
     qwen3_language: str | None = None
     qwen3_speaker: str | None = None
@@ -167,6 +169,16 @@ class TTSRequest(BaseModel):
             if len(v) != 64 or not all(c in "0123456789abcdef" for c in v):
                 raise ValueError("voice_checksum must be a 64-character hex string (SHA-256)")
         return v
+
+    @model_validator(mode="after")
+    def continuation_fields_paired(self) -> "TTSRequest":
+        has_audio = self.continuation_audio_base64 is not None
+        has_text = self.continuation_audio_text is not None
+        if has_audio != has_text:
+            raise ValueError(
+                "continuation_audio_base64 and continuation_audio_text must be provided together"
+            )
+        return self
 
 
 class VoiceCreateResponse(BaseModel):
@@ -253,7 +265,6 @@ async def synthesize(req: TTSRequest) -> Response:
                     "expected": meta.wav_sha256,
                 },
             )
-        # If meta.wav_sha256 is "" (legacy voice), allow through without error.
 
         # For chatterbox, prefer conditionals if available
         if model_name == "chatterbox":
@@ -318,6 +329,10 @@ async def synthesize(req: TTSRequest) -> Response:
             params["ras_win_max_num_repeat"] = req.ras_win_max_num_repeat
         if req.force_audio_gen is not None:
             params["force_audio_gen"] = req.force_audio_gen
+        if req.continuation_audio_base64 is not None:
+            params["continuation_audio_base64"] = req.continuation_audio_base64
+        if req.continuation_audio_text is not None:
+            params["continuation_audio_text"] = req.continuation_audio_text
     elif model_name == "qwen3":
         if req.qwen3_language is not None:
             params["qwen3_language"] = req.qwen3_language

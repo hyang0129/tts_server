@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import platform
 import subprocess as _sp
 from pathlib import Path
 
@@ -7,13 +9,20 @@ from loguru import logger
 
 from app.engine_base import SubprocessEngine
 
+_REPO_ROOT = Path(__file__).parent.parent
+_CB_PYTHON = os.environ.get("CB_WORKER_PYTHON") or (
+    str(_REPO_ROOT / ".venvs" / "chatterbox" / "Scripts" / "python.exe")
+    if platform.system() == "Windows"
+    else str(Path("/workspaces/.venvs/tts_server-chatterbox/bin/python"))
+)
+
 
 class ChatterboxEngine(SubprocessEngine):
     name = "chatterbox"
     sample_rate = 24000
     estimated_vram_mb = 4700
-    _worker_script = Path(__file__).parent.parent / "workers" / "chatterbox_worker.py"
-    _worker_python = str(Path(__file__).parent.parent / ".venvs" / "chatterbox" / "Scripts" / "python.exe")
+    _worker_script = _REPO_ROOT / "workers" / "chatterbox_worker.py"
+    _worker_python = _CB_PYTHON
 
     def _probe_deps(self) -> bool:
         logger.debug(f"Probing chatterbox deps: python={self._worker_python!r}")

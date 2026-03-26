@@ -47,6 +47,20 @@ For Turbo compatibility, `[laugh]` → `[laughter]`, `[chuckle]` → `[giggle]`,
 | `qwen3_speaker` | string \| null | null | Preset speaker name (CustomVoice models only). E.g. `"Ryan"`, `"Aiden"`. |
 | `qwen3_instruct` | string \| null | null | Tone/emotion instruction. E.g. `"Speak with warm enthusiasm"`. |
 
+**Higgs-specific parameters** (ignored by other models):
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `seed` | int \| null | `null` | RNG seed for reproducible generation |
+| `max_new_tokens` | int \| null | 2048 | Maximum tokens to generate |
+| `scene_description` | string \| null | `null` | Scene description for audio context |
+| `speaker_description` | string \| null | `null` | Speaker identity description |
+| `ras_win_len` | int \| null | 7 | RAS repetition window length |
+| `ras_win_max_num_repeat` | int \| null | 2 | Max repetitions in RAS window |
+| `force_audio_gen` | bool \| null | `null` | Force audio generation mode |
+| `continuation_audio_base64` | string \| null | `null` | Base64-encoded WAV (24 kHz mono) of the preceding generated segment. Anchors speaker identity across blocks. Requires `continuation_audio_text`. |
+| `continuation_audio_text` | string \| null | `null` | Transcript of `continuation_audio_base64`. Required when continuation audio is provided. |
+
 `speaker_description` is also accepted for Qwen3 and maps to the `instruct` parameter (voice-design mode).
 
 **Response**: `audio/wav` (PCM 16-bit, mono)

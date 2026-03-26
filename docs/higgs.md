@@ -26,6 +26,24 @@ Higgs uses a transcript-paired approach: it sees the reference audio alongside i
 - The transcript should closely match what is spoken in the reference audio.
 - Reference length: 5–20s works well. Longer references do not necessarily improve quality.
 
+## Continuation Audio
+
+For multi-block synthesis where speaker identity must remain consistent across segments,
+pass the WAV audio from the previous block along with its transcript:
+
+| Parameter | Description |
+|---|---|
+| `continuation_audio_base64` | Base64-encoded WAV (24 kHz mono) of the preceding generated segment |
+| `continuation_audio_text` | Transcript of `continuation_audio_base64` |
+
+Both fields must be supplied together or omitted together. The continuation audio is
+handled as a request-scoped tempfile and is never persisted to the voice store.
+
+This supplements (does not replace) the registered voice reference. When a voice is
+set, the model receives two in-context examples: the original reference clip and the
+tail of the previous block. This provides tighter prosodic and speaker-identity
+continuity across long-form narration.
+
 ## Description-Only Voice Generation
 
 Higgs can generate speech without any reference audio by using `speaker_description` alone:
