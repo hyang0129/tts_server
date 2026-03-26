@@ -164,7 +164,7 @@ class SubprocessEngine(TTSEngine):
                 raise
             # Worker crashed mid-generation (e.g. VRAM fragmentation after model swap).
             # Clear state and reload before retrying once.
-            logger.warning("Worker %s crashed during generate — reloading and retrying", self.name)
+            logger.warning(f"Worker {self.name} crashed during generate — reloading and retrying")
             self._proc = None
             self._is_loaded = False
             await self.load()
@@ -198,9 +198,7 @@ class SubprocessEngine(TTSEngine):
             ) from exc
         if response.get("status") == "error":
             if response.get("traceback"):
-                logger.error(
-                    "Worker %s error traceback:\n%s", self.name, response["traceback"]
-                )
+                logger.error(f"Worker {self.name} error traceback:\n{response['traceback']}")
             raise RuntimeError(f"{response.get('error', 'WorkerError')}: {response.get('message', '')}")
 
         logger.debug(f"Worker {self.name} responded OK")

@@ -106,7 +106,7 @@ install_blackwell_torch tts_server-higgs
 # flash-attn must be installed after torch (links against its CUDA extensions).
 # --no-build-isolation ensures it picks up the already-installed torch headers.
 echo "[install] Installing flash-attn into tts_server-higgs (compiles from source, may take ~5–10 min)..."
-"$VENVS_ROOT/tts_server-higgs/bin/pip" install flash-attn --no-build-isolation --quiet \
+"$VENVS_ROOT/tts_server-higgs/bin/pip" install flash-attn --no-build-isolation \
     && echo "[ok]   flash-attn installed" \
     || echo "[warn] flash-attn build failed — Higgs will fall back to SDPA attention"
 

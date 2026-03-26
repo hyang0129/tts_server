@@ -55,6 +55,7 @@ _SAMPLE_RATE = 24000
 
 _client = None
 _audio_tokenizer = None
+_attn_patched = False
 
 
 def _ensure_higgs_path() -> None:
@@ -73,7 +74,8 @@ def _patch_attn_impl() -> None:
     so we wrap from_pretrained to inject it before each call.  Only active when
     ATTN_IMPL differs from the transformers default ("eager").
     """
-    if ATTN_IMPL == "eager":
+    global _attn_patched
+    if _attn_patched or ATTN_IMPL == "eager":
         return
     from boson_multimodal.model.higgs_audio.modeling_higgs_audio import (  # type: ignore[import]
         HiggsAudioModel,
@@ -87,6 +89,7 @@ def _patch_attn_impl() -> None:
         return _orig_func(cls, *args, **kwargs)
 
     HiggsAudioModel.from_pretrained = _patched  # type: ignore[method-assign]
+    _attn_patched = True
     print(f"higgs_worker: attn_implementation={ATTN_IMPL!r}", file=sys.stderr, flush=True)
 
 
