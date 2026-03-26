@@ -210,7 +210,7 @@ def _higgs_available() -> bool:
         health = json.loads(resp.read())
         engines = health.get("engines", {})
         higgs = engines.get("higgs", {})
-        return bool(higgs.get("deps_available", True))
+        return bool(higgs.get("deps_available", False))
     except (urllib.error.URLError, OSError):
         return False
 
@@ -301,9 +301,11 @@ def sable_voice():
 
     Resolution order:
     1. Already registered with a matching wav_sha256 — use it directly.
-    2. Already registered but no stored sha256 (pre-checksum install) —
-       use the known SABLE_VOICE_SHA256 constant (server passes any valid-format
-       checksum for legacy voices).
+    2. Already registered but no stored sha256 (pre-backfill install) —
+       use the known SABLE_VOICE_SHA256 constant. VoiceStore._scan() now
+       backfills sha256 for all WAV-backed voices on startup, so this branch
+       is only reachable on a server that has not yet been restarted since
+       the voice was installed.
     3. Not registered — clone from the tracked fixture WAV.
     """
     existing = _get_voice(SABLE_VOICE_ID)
@@ -448,7 +450,9 @@ class TestHiggsContinuationAudio:
         checksum = sable_voice["wav_sha256"]
 
         # Block 13 — anchor, no continuation
-        _num, text_13, scene_13, _ = HANNO_CH1_BLOCKS[13]
+        block_13 = HANNO_CH1_BLOCKS[13]
+        assert block_13[0] == 13, "block index/num mismatch — was a block inserted?"
+        _num, text_13, scene_13, _ = block_13
         payload_13: dict = {
             "model": "higgs",
             "text": text_13,
@@ -462,7 +466,9 @@ class TestHiggsContinuationAudio:
         assert wav_13[:4] == b"RIFF", "Block 13 (anchor) did not return a valid WAV"
 
         # Block 14 ("So like.") — with block 13 as continuation
-        _num, text_14, scene_14, _ = HANNO_CH1_BLOCKS[14]
+        block_14 = HANNO_CH1_BLOCKS[14]
+        assert block_14[0] == 14, "block index/num mismatch — was a block inserted?"
+        _num, text_14, scene_14, _ = block_14
         payload_14: dict = {
             "model": "higgs",
             "text": text_14,

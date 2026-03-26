@@ -10,10 +10,11 @@ from loguru import logger
 from app.engine_base import SubprocessEngine
 
 _REPO_ROOT = Path(__file__).parent.parent
-if platform.system() == "Windows":
-    _CB_FULL_PYTHON = str(_REPO_ROOT / ".venvs" / "chatterbox" / "Scripts" / "python.exe")
-else:
-    _CB_FULL_PYTHON = str(Path("/workspaces/.venvs/tts_server-chatterbox/bin/python"))
+_CB_FULL_PYTHON = os.environ.get("CB_FULL_WORKER_PYTHON") or (
+    str(_REPO_ROOT / ".venvs" / "chatterbox" / "Scripts" / "python.exe")
+    if platform.system() == "Windows"
+    else str(Path("/workspaces/.venvs/tts_server-chatterbox/bin/python"))
+)
 
 
 class ChatterboxFullEngine(SubprocessEngine):

@@ -19,11 +19,11 @@ else:
 _VRAM_BY_QUANT = {0: 12000, 4: 5000, 8: 9000}
 
 _REPO_ROOT = Path(__file__).parent.parent
-if platform.system() == "Windows":
-    _HIGGS_PYTHON = str(_REPO_ROOT / ".venvs" / "higgs" / "Scripts" / "python.exe")
-else:
-    # Linux / WSL: venvs are under /workspaces/.venvs/tts_server-higgs/
-    _HIGGS_PYTHON = str(Path("/workspaces/.venvs/tts_server-higgs/bin/python"))
+_HIGGS_PYTHON = os.environ.get("HIGGS_WORKER_PYTHON") or (
+    str(_REPO_ROOT / ".venvs" / "higgs" / "Scripts" / "python.exe")
+    if platform.system() == "Windows"
+    else str(Path("/workspaces/.venvs/tts_server-higgs/bin/python"))
+)
 
 
 class HiggsEngine(SubprocessEngine):

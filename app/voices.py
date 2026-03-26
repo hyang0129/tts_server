@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import pickle
 import re
 import shutil
@@ -160,7 +161,9 @@ class VoiceStore:
                         sha = hashlib.sha256(ref_wav.read_bytes()).hexdigest()
                         meta = meta.model_copy(update={"wav_sha256": sha})
                         raw["wav_sha256"] = sha
-                        meta_path.write_text(json.dumps(raw, indent=2))
+                        tmp = meta_path.with_suffix(".tmp")
+                        tmp.write_text(json.dumps(raw, indent=2))
+                        os.replace(tmp, meta_path)
                         logger.info(
                             f"Backfilled wav_sha256 for legacy voice {meta.voice_id!r}: {sha[:16]}..."
                         )

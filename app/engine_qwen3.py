@@ -19,10 +19,11 @@ ESTIMATED_VRAM_MB = int(os.environ.get("QWEN3_VRAM_MB", "5500"))
 _CACHE_VERSION: int = 2
 
 _REPO_ROOT = Path(__file__).parent.parent
-if platform.system() == "Windows":
-    _QWEN3_PYTHON = str(_REPO_ROOT / ".venvs" / "qwen3" / "Scripts" / "python.exe")
-else:
-    _QWEN3_PYTHON = str(Path("/workspaces/.venvs/tts_server-qwen3/bin/python"))
+_QWEN3_PYTHON = os.environ.get("QWEN3_WORKER_PYTHON") or (
+    str(_REPO_ROOT / ".venvs" / "qwen3" / "Scripts" / "python.exe")
+    if platform.system() == "Windows"
+    else str(Path("/workspaces/.venvs/tts_server-qwen3/bin/python"))
+)
 
 
 class Qwen3Engine(SubprocessEngine):

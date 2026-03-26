@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import platform
 import subprocess as _sp
 from pathlib import Path
@@ -9,10 +10,11 @@ from loguru import logger
 from app.engine_base import SubprocessEngine
 
 _REPO_ROOT = Path(__file__).parent.parent
-if platform.system() == "Windows":
-    _CB_PYTHON = str(_REPO_ROOT / ".venvs" / "chatterbox" / "Scripts" / "python.exe")
-else:
-    _CB_PYTHON = str(Path("/workspaces/.venvs/tts_server-chatterbox/bin/python"))
+_CB_PYTHON = os.environ.get("CB_WORKER_PYTHON") or (
+    str(_REPO_ROOT / ".venvs" / "chatterbox" / "Scripts" / "python.exe")
+    if platform.system() == "Windows"
+    else str(Path("/workspaces/.venvs/tts_server-chatterbox/bin/python"))
+)
 
 
 class ChatterboxEngine(SubprocessEngine):

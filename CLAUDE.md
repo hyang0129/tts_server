@@ -140,6 +140,10 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 - `HIGGS_QUANT_BITS` — quantization bits for higgs (4, 8, or 0 for bf16)
 - `HIGGS_ATTN_IMPL` — attention implementation for higgs (`flash_attention_2` default, `sdpa`, or `eager`). `flash_attention_2` requires `flash_attn` which is installed automatically by `scripts/setup_venvs.sh`. `sdpa` uses torch's built-in SDPA kernel (no extra packages — fallback if flash_attn build fails).
 - `HIGGS_REPO_PATH` — path to faster-higgs-audio repo (default %USERPROFILE%\tmp\faster-higgs-audio)
+- `HIGGS_WORKER_PYTHON` — override the Python interpreter used for the higgs subprocess worker (default: `.venvs/higgs/Scripts/python.exe` on Windows, `/workspaces/.venvs/tts_server-higgs/bin/python` on Linux)
+- `CB_WORKER_PYTHON` — override the Python interpreter used for the chatterbox subprocess worker (default: `.venvs/chatterbox/Scripts/python.exe` on Windows, `/workspaces/.venvs/tts_server-chatterbox/bin/python` on Linux)
+- `CB_FULL_WORKER_PYTHON` — override the Python interpreter used for the chatterbox_full subprocess worker (default: same as `CB_WORKER_PYTHON`)
+- `QWEN3_WORKER_PYTHON` — override the Python interpreter used for the qwen3 subprocess worker (default: `.venvs/qwen3/Scripts/python.exe` on Windows, `/workspaces/.venvs/tts_server-qwen3/bin/python` on Linux)
 - `HIGGS_MODEL_ID` — HuggingFace model ID for higgs
 - `HIGGS_TOKENIZER_ID` — HuggingFace tokenizer ID for higgs
 - `CB_FULL_VRAM_MB` — override VRAM budget estimate for chatterbox_full (default 4700)

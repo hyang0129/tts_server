@@ -7,6 +7,7 @@ module can be imported and exercised in any environment.
 from __future__ import annotations
 
 import base64
+import binascii
 import os
 import sys
 import types
@@ -161,8 +162,8 @@ class TestContinuationAudio:
 
         original_ntf = _tempfile.NamedTemporaryFile
 
-        def tracking_ntf(**kwargs):
-            f = original_ntf(**kwargs)
+        def tracking_ntf(*args, **kwargs):
+            f = original_ntf(*args, **kwargs)
             created_paths.append(f.name)
             return f
 
@@ -203,7 +204,7 @@ class TestContinuationAudio:
         fake_client._max_new_tokens = 2048
         hw._client = fake_client
 
-        with pytest.raises(Exception):
+        with pytest.raises((binascii.Error, ValueError)):
             hw._cmd_generate({
                 "text": "test",
                 "voice_ref_path": None,
@@ -213,6 +214,43 @@ class TestContinuationAudio:
                     "continuation_audio_text": "some text",
                 },
             })
+
+    def test_continuation_bad_wav_no_tempfile_leaked(self, higgs_worker):
+        """Valid base64 that decodes to non-WAV bytes must raise before NamedTemporaryFile."""
+        hw = higgs_worker
+
+        fake_tokenizer = MagicMock()
+        hw._audio_tokenizer = fake_tokenizer
+
+        fake_client = MagicMock()
+        fake_client._max_new_tokens = 2048
+        hw._client = fake_client
+
+        not_a_wav_b64 = base64.b64encode(b"not a wav file").decode()
+
+        import unittest.mock as _mock
+        import wave as _wave
+
+        ntf_called = []
+
+        def tracking_ntf(*args, **kwargs):
+            ntf_called.append(True)
+            import tempfile as _tempfile
+            return _tempfile.NamedTemporaryFile(*args, **kwargs)
+
+        with _mock.patch("tempfile.NamedTemporaryFile", side_effect=tracking_ntf):
+            with pytest.raises((ValueError, _wave.Error)):
+                hw._cmd_generate({
+                    "text": "test",
+                    "voice_ref_path": None,
+                    "voice_ref_text": None,
+                    "params": {
+                        "continuation_audio_base64": not_a_wav_b64,
+                        "continuation_audio_text": "some text",
+                    },
+                })
+
+        assert not ntf_called, "NamedTemporaryFile must not be called when WAV parsing fails"
 
     def test_continuation_without_voice_ref_has_single_audio_id(self, higgs_worker):
         """Continuation-only (no registered voice ref) must produce audio_ids of length 1."""

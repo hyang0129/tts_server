@@ -73,6 +73,8 @@ def _ensure_higgs_path() -> None:
 
 def _trim_wav_tail(wav_bytes: bytes, max_seconds: float) -> bytes:
     """Return the last `max_seconds` of a WAV file. Returns original if shorter."""
+    if max_seconds <= 0:
+        raise ValueError("max_seconds must be positive")
     buf = io.BytesIO(wav_bytes)
     with wave.open(buf, "rb") as wf:
         n_channels = wf.getnchannels()
@@ -208,7 +210,10 @@ def _cmd_generate(req: dict) -> None:
 
             # Trim to last _MAX_CONTINUATION_S seconds — longer tail gives diminishing
             # identity benefit while bloating the context window.
-            raw_bytes = _trim_wav_tail(raw_bytes, _MAX_CONTINUATION_S)
+            try:
+                raw_bytes = _trim_wav_tail(raw_bytes, _MAX_CONTINUATION_S)
+            except Exception as exc:
+                raise ValueError(f"continuation_audio_base64 does not contain a valid WAV: {exc}") from exc
 
             tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
             _continuation_tmp_path = tmp.name  # set before write so finally can clean up
