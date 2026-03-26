@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import subprocess as _sp
 from pathlib import Path
 
@@ -17,13 +18,19 @@ ESTIMATED_VRAM_MB = int(os.environ.get("QWEN3_VRAM_MB", "5500"))
 # voices.py imports this constant; keep it here so that import still works.
 _CACHE_VERSION: int = 2
 
+_REPO_ROOT = Path(__file__).parent.parent
+if platform.system() == "Windows":
+    _QWEN3_PYTHON = str(_REPO_ROOT / ".venvs" / "qwen3" / "Scripts" / "python.exe")
+else:
+    _QWEN3_PYTHON = str(Path("/workspaces/.venvs/tts_server-qwen3/bin/python"))
+
 
 class Qwen3Engine(SubprocessEngine):
     name = "qwen3"
     sample_rate = 24000
     estimated_vram_mb = ESTIMATED_VRAM_MB
-    _worker_script = Path(__file__).parent.parent / "workers" / "qwen3_worker.py"
-    _worker_python = str(Path(__file__).parent.parent / ".venvs" / "qwen3" / "Scripts" / "python.exe")
+    _worker_script = _REPO_ROOT / "workers" / "qwen3_worker.py"
+    _worker_python = _QWEN3_PYTHON
 
     def _probe_deps(self) -> bool:
         logger.debug(f"Probing qwen3 deps at {self._worker_python!r}")
