@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import io
 import json
-import logging
-import logging.handlers
+import logging  # retained for InterceptHandler — do not remove
 import os
+import sys
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,36 +15,8 @@ import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
+from loguru import logger
 from pydantic import BaseModel, Field, field_validator
-
-
-def _configure_logging() -> None:
-    """Set up rotating file handler so all log output is captured to disk.
-
-    Writes to logs/tts_server.log (next to the repo root, capped at 10 MB,
-    keeping 5 rotated files). Console output is preserved alongside it.
-    """
-    log_dir = Path(__file__).parent.parent / "logs"
-    log_dir.mkdir(exist_ok=True)
-    log_file = log_dir / "tts_server.log"
-
-    fmt = logging.Formatter(
-        "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    file_handler = logging.handlers.RotatingFileHandler(
-        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
-    )
-    file_handler.setFormatter(fmt)
-    file_handler.setLevel(logging.DEBUG)
-
-    root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
-    root.addHandler(file_handler)
-
-
-_configure_logging()
 
 from app.engine_chatterbox import ChatterboxEngine
 from app.engine_chatterbox_full import ChatterboxFullEngine
@@ -58,7 +31,19 @@ from app.voices import (
     _slugify,
 )
 
-logger = logging.getLogger(__name__)
+
+class InterceptHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = str(record.levelno)
+        frame, depth = sys._getframe(6), 6
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
 
 MAX_TEXT_LEN = 5000
 VOICES_DIR = os.environ.get("TTS_VOICES_DIR", "./voices")
@@ -68,6 +53,22 @@ AVAILABLE_VRAM_MB = int(os.environ.get("AVAILABLE_VRAM_MB", "12000"))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.remove()
+    logger.add(
+        sys.stderr,
+        level="DEBUG",
+        colorize=True,
+        format="{time:HH:mm:ss.SSS} | {level:<8} | {name}:{function}:{line} — {message}",
+    )
+    logger.add(
+        Path(__file__).parent.parent / "tts_server.log",
+        level="DEBUG",
+        rotation="20 MB",
+        retention="7 days",
+        serialize=False,
+    )
+    logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+
     manager = ModelManager(available_vram_mb=AVAILABLE_VRAM_MB)
     manager.register_engine(ChatterboxEngine())
     manager.register_engine(ChatterboxFullEngine())
@@ -75,11 +76,7 @@ async def lifespan(app: FastAPI):
     manager.register_engine(Qwen3Engine())
 
     available = manager.available_models()
-    logger.info(
-        "TTS server starting. VRAM budget: %dMB. Available models: %s",
-        AVAILABLE_VRAM_MB,
-        available,
-    )
+    logger.info(f"TTS server starting. VRAM budget: {AVAILABLE_VRAM_MB}MB. Available models: {available}")
 
     app.state.manager = manager
     app.state.lock = asyncio.Lock()
@@ -87,10 +84,7 @@ async def lifespan(app: FastAPI):
 
     manager.start_idle_monitor()
 
-    logger.info(
-        "Ready. %d registered voice(s).",
-        len(app.state.voice_store.list_voices()),
-    )
+    logger.info(f"Ready. {len(app.state.voice_store.list_voices())} registered voice(s).")
     yield
 
     await manager.shutdown()
@@ -101,18 +95,18 @@ app = FastAPI(title="TTS Server", version="0.1.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    logger.debug(f"{request.method} {request.url.path}")
+    t0 = time.perf_counter()
     response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - t0) * 1000
     if response.status_code >= 400:
         # Re-read the response body to log the error detail, then re-stream it.
         body = b""
         async for chunk in response.body_iterator:
             body += chunk
         logger.warning(
-            "%s %s -> %d | %s",
-            request.method,
-            request.url.path,
-            response.status_code,
-            body.decode("utf-8", errors="replace"),
+            f"{request.method} {request.url.path} -> {response.status_code}"
+            f" | {elapsed_ms:.1f}ms | {body.decode('utf-8', errors='replace')}"
         )
         from fastapi.responses import Response as _Response
         return _Response(
@@ -121,6 +115,7 @@ async def log_requests(request: Request, call_next):
             headers=dict(response.headers),
             media_type=response.media_type,
         )
+    logger.debug(f"{request.method} {request.url.path} -> {response.status_code} | {elapsed_ms:.1f}ms")
     return response
 
 
@@ -338,14 +333,21 @@ async def synthesize(req: TTSRequest) -> Response:
         if req.max_new_tokens is not None:
             params["max_new_tokens"] = req.max_new_tokens
 
+    logger.info(
+        f"TTS request: model={req.model}, voice_id={req.voice},"
+        f" text_len={len(req.text)}, text={req.text[:80]!r}"
+    )
     async with app.state.lock:
         engine = await manager.ensure_loaded(model_name)
+        t0 = time.perf_counter()
         audio, sr = await engine.generate(
             text=req.text,
             voice_ref_path=voice_ref_path,
             voice_ref_text=voice_ref_text,
             **params,
         )
+        elapsed = time.perf_counter() - t0
+    logger.info(f"TTS complete: model={req.model}, generate_ms={elapsed * 1000:.1f}")
 
     headers = _audio_headers(audio, sr)
     if req.voice:
@@ -383,6 +385,11 @@ async def clone_voice(
     voice_store: VoiceStore = app.state.voice_store
     audio_bytes = await reference_audio.read()
     original_filename = reference_audio.filename or "unknown.wav"
+    model = target_model or "chatterbox"
+    logger.info(
+        f"Voice clone: model={model}, ref_size={len(audio_bytes)}B,"
+        f" ref_text_len={len(reference_text) if reference_text else 0}"
+    )
 
     try:
         meta = voice_store.create_voice(
@@ -398,6 +405,7 @@ async def clone_voice(
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc))
 
+    logger.info(f"Voice cloned: voice_id={meta.voice_id}")
     return VoiceCreateResponse(
         voice_id=meta.voice_id,
         name=meta.name,
@@ -431,6 +439,7 @@ async def blend_voices(
     manager: ModelManager = app.state.manager
     voice_store: VoiceStore = app.state.voice_store
 
+    logger.info(f"Voice blend: a={voice_a}, b={voice_b}, weight={texture_mix}")
     for vid, label in [(voice_a, "voice_a"), (voice_b, "voice_b")]:
         meta = voice_store.get_voice(vid)
         if meta is None:
@@ -489,7 +498,7 @@ async def blend_voices(
         raw["blend_config"] = blend_config
         (voice_dir / "metadata.json").write_text(json.dumps(raw, indent=2))
         voice_store._index[voice_id] = meta
-        logger.info("Created blended Qwen3 voice %r (id=%s)", name, voice_id)
+        logger.info(f"Voice blended: voice_id={meta.voice_id}")
         return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
 
     if model == "chatterbox_full":
@@ -528,7 +537,7 @@ async def blend_voices(
         raw["blend_config"] = blend_config
         (voice_dir / "metadata.json").write_text(json.dumps(raw, indent=2))
         voice_store._index[voice_id] = meta
-        logger.info("Created blended voice %r (id=%s)", name, voice_id)
+        logger.info(f"Voice blended: voice_id={meta.voice_id}")
         return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
 
     # --- chatterbox blend ---
@@ -566,7 +575,7 @@ async def blend_voices(
     raw["blend_config"] = blend_config
     (voice_dir / "metadata.json").write_text(json.dumps(raw, indent=2))
     voice_store._index[voice_id] = meta
-    logger.info("Created blended voice %r (id=%s)", name, voice_id)
+    logger.info(f"Voice blended: voice_id={meta.voice_id}")
     return VoiceCreateResponse(voice_id=meta.voice_id, name=meta.name)
 
 
@@ -683,6 +692,7 @@ async def delete_voice(voice_id: str) -> Response:
     voice_store: VoiceStore = app.state.voice_store
     if not voice_store.delete_voice(voice_id):
         raise HTTPException(404, detail=f"Voice not found: {voice_id}")
+    logger.info(f"Voice deleted: voice_id={voice_id}")
     return Response(status_code=204)
 
 

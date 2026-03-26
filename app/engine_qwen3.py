@@ -4,6 +4,8 @@ import os
 import subprocess as _sp
 from pathlib import Path
 
+from loguru import logger
+
 from app.engine_base import SubprocessEngine
 
 MODEL_ID = os.environ.get("QWEN3_MODEL_ID", "Qwen/Qwen3-TTS-12Hz-1.7B-Base")
@@ -24,13 +26,16 @@ class Qwen3Engine(SubprocessEngine):
     _worker_python = "/workspaces/.venvs/tts_server-qwen3/bin/python"
 
     def _probe_deps(self) -> bool:
+        logger.debug(f"Probing qwen3 deps at {self._worker_python!r}")
         try:
-            return _sp.run(
+            result = _sp.run(
                 [self._worker_python, "-c", "import qwen_tts"],
                 capture_output=True, timeout=10
             ).returncode == 0
         except Exception:
-            return False
+            result = False
+        logger.debug(f"qwen3 deps available: {result}")
+        return result
 
     async def blend_voice_prompts_ipc(
         self,
@@ -40,6 +45,7 @@ class Qwen3Engine(SubprocessEngine):
         out_pkl_path: str,
     ) -> None:
         """Send blend_voice_prompts to worker. Worker writes pkl to out_pkl_path."""
+        logger.debug(f"blend_voice_prompts_ipc → worker {self.name}")
         await self._send_command({
             "cmd": "blend_voice_prompts",
             "pkl_path_a": pkl_path_a,
@@ -47,3 +53,4 @@ class Qwen3Engine(SubprocessEngine):
             "alpha": alpha,
             "out_pkl_path": out_pkl_path,
         })
+        logger.debug(f"blend_voice_prompts_ipc ← worker {self.name}: done")

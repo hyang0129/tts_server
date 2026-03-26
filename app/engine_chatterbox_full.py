@@ -4,6 +4,8 @@ import os
 import subprocess as _sp
 from pathlib import Path
 
+from loguru import logger
+
 from app.engine_base import SubprocessEngine
 
 
@@ -15,13 +17,16 @@ class ChatterboxFullEngine(SubprocessEngine):
     _worker_python = "/workspaces/.venvs/tts_server-chatterbox/bin/python"
 
     def _probe_deps(self) -> bool:
+        logger.debug(f"Probing chatterbox_full deps: python={self._worker_python!r}")
         try:
-            return _sp.run(
+            result = _sp.run(
                 [self._worker_python, "-c", "import chatterbox"],
                 capture_output=True, timeout=10
             ).returncode == 0
         except Exception:
-            return False
+            result = False
+        logger.debug(f"chatterbox_full deps available: {result}")
+        return result
 
     async def blend_voices(
         self,
@@ -31,6 +36,7 @@ class ChatterboxFullEngine(SubprocessEngine):
         out_pt_path: str,
     ) -> None:
         """Send blend_voices command to worker. Worker writes .pt directly to out_pt_path."""
+        logger.debug(f"blend_voices → worker {self.name}: a={path_a!r} b={path_b!r} mix={texture_mix}")
         await self._send_command({
             "cmd": "blend_voices",
             "path_a": path_a,
@@ -38,3 +44,4 @@ class ChatterboxFullEngine(SubprocessEngine):
             "texture_mix": texture_mix,
             "out_pt_path": out_pt_path,
         })
+        logger.debug(f"blend_voices ← worker {self.name}: wrote {out_pt_path!r}")

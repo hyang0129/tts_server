@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
-import logging
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 import numpy as np
+from loguru import logger
 
 
 class TTSEngine(ABC):
@@ -136,7 +137,6 @@ class SubprocessEngine(TTSEngine):
         **params,
     ) -> tuple[np.ndarray, int]:
         """Send generate command to worker. Retries once if worker crashes mid-generation."""
-        logger = logging.getLogger(__name__)
         cmd = {
             "cmd": "generate",
             "text": text,
@@ -144,6 +144,7 @@ class SubprocessEngine(TTSEngine):
             "voice_ref_text": voice_ref_text,
             "params": params,
         }
+        t0 = time.perf_counter()
         try:
             response = await self._send_command(cmd)
         except RuntimeError as exc:
@@ -156,6 +157,8 @@ class SubprocessEngine(TTSEngine):
             self._is_loaded = False
             await self.load()
             response = await self._send_command(cmd)
+        elapsed = time.perf_counter() - t0
+        logger.info(f"generate completed in {elapsed:.3f}s for engine {self.name}")
 
         audio = np.frombuffer(base64.b64decode(response["audio"]), dtype=np.float32)
         sample_rate = response.get("sample_rate", self.sample_rate)
@@ -166,6 +169,7 @@ class SubprocessEngine(TTSEngine):
         if self._proc is None or self._proc.returncode is not None:
             raise RuntimeError(f"Worker process for {self.name} is not running")
 
+        logger.debug(f"Sending command {cmd['cmd']} to worker {self.name}")
         line = (json.dumps(cmd) + "\n").encode()
         self._proc.stdin.write(line)
         await self._proc.stdin.drain()
@@ -181,11 +185,11 @@ class SubprocessEngine(TTSEngine):
                 f"Worker {self.name} sent non-JSON response: {response_line!r}"
             ) from exc
         if response.get("status") == "error":
-            logger = logging.getLogger(__name__)
             if response.get("traceback"):
                 logger.error(
                     "Worker %s error traceback:\n%s", self.name, response["traceback"]
                 )
             raise RuntimeError(f"{response.get('error', 'WorkerError')}: {response.get('message', '')}")
 
+        logger.debug(f"Worker {self.name} responded OK")
         return response

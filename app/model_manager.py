@@ -2,15 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import gc
-import logging
 import time
+
+from loguru import logger
 
 from app.engine_base import TTSEngine
 
-logger = logging.getLogger(__name__)
-
 IDLE_TIMEOUT_S = 60
 IDLE_CHECK_INTERVAL_S = 10
+
+
+def _vram_free_mb() -> int | None:
+    try:
+        import torch
+        if torch.cuda.is_available():
+            reserved = torch.cuda.memory_reserved(0)
+            total = torch.cuda.get_device_properties(0).total_memory
+            return (total - reserved) // (1024 ** 2)
+    except Exception:
+        pass
+    return None
 
 
 class ModelManager:
@@ -68,6 +79,7 @@ class ModelManager:
             if self._active_engine == model_name:
                 engine = self._engines[model_name]
                 if engine.is_loaded:
+                    logger.debug(f"Engine {model_name} already loaded — cache hit")
                     return engine
 
             # Unload current engine if one is loaded.
@@ -75,22 +87,33 @@ class ModelManager:
                 await self._unload_current()
 
             engine = self._engines[model_name]
-            logger.info("Loading engine: %s", model_name)
+            vram_before = _vram_free_mb()
+            logger.debug(f"VRAM before load: {vram_before} MB free")
+            t0 = time.perf_counter()
             await engine.load()
+            load_ms = time.perf_counter() - t0
             self._active_engine = model_name
-            logger.info("Engine %s loaded", model_name)
+            vram_after = _vram_free_mb()
+            logger.debug(f"VRAM after load: {vram_after} MB free")
+            logger.info(f"Engine {model_name} loaded in {load_ms:.3f}s")
             return engine
 
     async def _unload_current(self) -> None:
         """Unload the currently active engine and free VRAM."""
         if self._active_engine is None:
             return
-        engine = self._engines[self._active_engine]
-        logger.info("Unloading engine: %s", self._active_engine)
+        name = self._active_engine
+        engine = self._engines[name]
+        vram_before = _vram_free_mb()
+        logger.debug(f"VRAM before unload: {vram_before} MB free")
+        t0 = time.perf_counter()
         await engine.unload()
+        unload_ms = time.perf_counter() - t0
         gc.collect()  # harmless, keep
         self._active_engine = None
-        logger.info("VRAM freed")
+        vram_after = _vram_free_mb()
+        logger.debug(f"VRAM after unload: {vram_after} MB free")
+        logger.info(f"Engine {name} unloaded in {unload_ms:.3f}s")
 
     async def shutdown(self) -> None:
         """Unload any loaded engine. Called at server shutdown."""
@@ -120,6 +143,7 @@ class ModelManager:
                     if self._last_request_time == 0.0:
                         continue
                     elapsed = time.monotonic() - self._last_request_time
+                    logger.debug(f"Idle monitor: engine={self._active_engine}, idle_s={elapsed:.1f}")
                     if elapsed > IDLE_TIMEOUT_S:
                         logger.info(
                             "Engine %s idle for %.0fs, unloading",
