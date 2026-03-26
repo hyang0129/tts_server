@@ -20,6 +20,12 @@ dependencies = [
 ]
 
 [project.scripts]
+# Starts uvicorn on 127.0.0.1:8765 (override with TTS_HOST / TTS_PORT env vars).
+# NOTE: run `pip install -e .` in the host venv (.venv\) to register this script.
+# NOTE: if using VS Code, prefer start_server.ps1 / start_server.sh instead —
+#       VS Code auto-forwards ports from bash/WSL-spawned processes, making the
+#       server unreachable from Windows tools. The PS script avoids this by
+#       spawning uvicorn as a detached native Windows process.
 tts-server = "app.cli:serve"
 
 [tool.setuptools.packages.find]
