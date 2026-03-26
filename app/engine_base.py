@@ -89,6 +89,11 @@ class SubprocessEngine(TTSEngine):
         if self.is_loaded:
             return
 
+        # Clean up any dead proc left over from a previous failed load so we don't
+        # accumulate orphaned processes (each holds ~1-2 GB of Windows commit charge).
+        if self._proc is not None and self._proc.returncode is not None:
+            self._proc = None
+
         self._proc = await asyncio.create_subprocess_exec(
             self._worker_python, str(self._worker_script),
             stdin=asyncio.subprocess.PIPE,
@@ -97,8 +102,15 @@ class SubprocessEngine(TTSEngine):
             limit=256 * 1024 * 1024,  # 256 MB — base64 audio can be large
         )
 
-        # Send load command
-        response = await self._send_command({"cmd": "load"})
+        # Send load command; if it fails, kill and clear the proc immediately so
+        # the next load() call doesn't orphan it and leak Windows commit charge.
+        try:
+            response = await self._send_command({"cmd": "load"})
+        except Exception:
+            self._proc.kill()
+            await self._proc.wait()
+            self._proc = None
+            raise
         self.sample_rate = response.get("sample_rate", self.sample_rate)
         self._is_loaded = True
 

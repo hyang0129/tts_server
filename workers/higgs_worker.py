@@ -32,7 +32,9 @@ from workers.worker_protocol import read_request, send_error, send_ok
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-_HIGGS_REPO = os.environ.get("HIGGS_REPO_PATH", "/tmp/faster-higgs-audio")
+_HIGGS_REPO = os.environ.get("HIGGS_REPO_PATH") or os.path.join(
+    os.environ.get("USERPROFILE", r"C:\Users\Default"), "tmp", "faster-higgs-audio"
+)
 MODEL_ID = os.environ.get("HIGGS_MODEL_ID", "bosonai/higgs-audio-v2-generation-3B-base")
 TOKENIZER_ID = os.environ.get("HIGGS_TOKENIZER_ID", "bosonai/higgs-audio-v2-tokenizer")
 

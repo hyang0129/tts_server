@@ -25,7 +25,7 @@ The server targets **one model in VRAM at a time**. Recommended VRAM budget is 1
 The Higgs engine depends on this repo and it is not available on PyPI.
 
 ```bash
-git clone https://github.com/sorbetstudio/faster-higgs-audio /tmp/faster-higgs-audio
+git clone https://github.com/sorbetstudio/faster-higgs-audio %USERPROFILE%\tmp\faster-higgs-audio
 ```
 
 ### 2.2 Create and activate the venv
@@ -73,7 +73,7 @@ This overrides the chatterbox pin. chatterbox-tts itself runs correctly on torch
 ### 2.7 Install faster-higgs-audio
 
 ```bash
-pip install -e /tmp/faster-higgs-audio
+pip install -e %USERPROFILE%\tmp\faster-higgs-audio
 ```
 
 ### 2.8 Install Higgs runtime dependencies
@@ -110,31 +110,40 @@ These ranges cannot coexist in a single venv. The server therefore runs the Fast
 
 ### Venv layout
 
+All paths are relative to the repo root:
+
 | Venv | Path | Engines | Key constraint |
 |------|------|---------|----------------|
-| Host | `/workspaces/.venvs/tts_server/` | FastAPI server | fastapi, uvicorn, pydantic — no torch, no engine packages |
-| Chatterbox | `/workspaces/.venvs/tts_server-chatterbox/` | chatterbox, chatterbox_full | chatterbox-tts |
-| Higgs | `/workspaces/.venvs/tts_server-higgs/` | higgs | transformers<4.47.0 |
-| Qwen3 | `/workspaces/.venvs/tts_server-qwen3/` | qwen3 | transformers>=4.57.3 |
+| Host | `.venv\` | FastAPI server | fastapi, uvicorn, pydantic — no torch, no engine packages |
+| Chatterbox | `.venvs\chatterbox\` | chatterbox, chatterbox_full | chatterbox-tts |
+| Higgs | `.venvs\higgs\` | higgs | transformers<4.47.0 |
+| Qwen3 | `.venvs\qwen3\` | qwen3 | transformers>=4.57.3 |
 
-### Creating all engine venvs
+### Creating all engine venvs (Windows)
 
-Run once from the repo root after a fresh clone or container rebuild:
+Run once from the repo root after a fresh clone:
 
-```bash
-bash scripts/setup_venvs.sh
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup_venvs.ps1
 ```
 
-This script creates and populates each engine venv. The host venv (`/workspaces/.venvs/tts_server/`) must already exist (created in step 2.2) — the script only creates the engine venvs.
+This script:
+- Creates/skips each venv (idempotent)
+- Installs the appropriate requirements file into each
+- Auto-detects Blackwell GPU (sm_12.x) and installs `torch==2.10.0+cu128` into engine venvs
+- Clones faster-higgs-audio to `D:\tmp\faster-higgs-audio` if not already present
 
 ### Starting the server
 
-Always start the server using the host venv. The model manager automatically selects the correct engine venv when launching a subprocess worker.
+Use `start_server.ps1` (or `start_server.sh` from the bash tool). This runs uvicorn as a native
+Windows process to avoid VS Code port-forwarding interference:
 
-```bash
-AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/uvicorn app.main:app \
-    --host 0.0.0.0 --port 8000
+```powershell
+.\start_server.ps1                     # port 8765, 10000 MB VRAM (defaults)
+.\start_server.ps1 -Port 8765 -VramMb 10000
 ```
+
+The model manager automatically selects the correct engine venv when launching a subprocess worker.
 
 ---
 
@@ -175,7 +184,7 @@ AVAILABLE_VRAM_MB=10000
 HIGGS_QUANT_BITS=8
 
 # Path to the cloned faster-higgs-audio repo (step 2.1).
-HIGGS_REPO_PATH=/tmp/faster-higgs-audio
+HIGGS_REPO_PATH=%USERPROFILE%\tmp\faster-higgs-audio
 
 # HuggingFace model and tokenizer IDs for Higgs Audio v2.
 HIGGS_MODEL_ID=bosonai/higgs-audio-v2-generation-3B-base
@@ -196,13 +205,19 @@ Additional variables (optional, defaults shown):
 
 ## 5. Running the Server
 
-The server is started using the **host venv** (`/workspaces/.venvs/tts_server/`), which contains only fastapi and uvicorn. Engine subprocess workers are launched in their own venvs automatically.
+The server is started using `start_server.ps1`, which uses the host venv (`.venv\`) — fastapi/uvicorn
+only. Engine subprocess workers are launched in their own venvs automatically by the model manager.
 
-```bash
-cd /workspaces/hub_3/tts_server
-AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/uvicorn app.main:app \
-    --host 0.0.0.0 --port 8000
+```powershell
+# From PowerShell (recommended):
+.\start_server.ps1
+
+# From Claude's bash tool:
+./start_server.sh
 ```
+
+Default port is **8765**. VS Code port-forwarding can intercept processes started from bash/WSL;
+the PowerShell script avoids this by spawning a native Windows process.
 
 Models are lazy-loaded on first request. Startup is fast; the first `/tts` call will take 3–21 seconds while the model loads into VRAM.
 
@@ -303,10 +318,11 @@ with a constant description and seed=0. Voice cloning (reference audio anchor) i
 for multi-block narration. The reference audio must be pre-cloned on the server before
 video_agent_long tests can run.
 
-**Setup order in a fresh container:**
-1. Start tts_server: `uvicorn app.main:app --host 0.0.0.0 --port 8000`
-2. Install fixtures: `python tests/setup_test_voices.py`
-3. Run video_agent_long tests (or tts_server tests)
+**Setup order on a fresh machine:**
+1. Run venv setup: `powershell -ExecutionPolicy Bypass -File scripts\setup_venvs.ps1`
+2. Start tts_server: `.\start_server.ps1`
+3. Install fixtures: `.venv\Scripts\python tests\setup_test_voices.py`
+4. Run video_agent_long tests (or tts_server tests)
 
 **Adding a new cross-repo fixture voice:** commit the reference audio to
 `tests/voice_fixtures/<id>/`, document it in the table above, and update
