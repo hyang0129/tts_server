@@ -153,6 +153,17 @@ class VoiceStore:
             try:
                 raw = json.loads(meta_path.read_text())
                 meta = VoiceMetadata(**raw)
+                # Backfill wav_sha256 for legacy voices that were stored without it.
+                if not meta.wav_sha256:
+                    ref_wav = meta_path.parent / "reference.wav"
+                    if ref_wav.exists():
+                        sha = hashlib.sha256(ref_wav.read_bytes()).hexdigest()
+                        meta = meta.model_copy(update={"wav_sha256": sha})
+                        raw["wav_sha256"] = sha
+                        meta_path.write_text(json.dumps(raw, indent=2))
+                        logger.info(
+                            f"Backfilled wav_sha256 for legacy voice {meta.voice_id!r}: {sha[:16]}..."
+                        )
                 self._index[meta.voice_id] = meta
             except Exception:
                 logger.warning(f"Skipping corrupt voice metadata: {meta_path}")

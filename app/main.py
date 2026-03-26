@@ -265,7 +265,6 @@ async def synthesize(req: TTSRequest) -> Response:
                     "expected": meta.wav_sha256,
                 },
             )
-        # If meta.wav_sha256 is "" (legacy voice), allow through without error.
 
         # For chatterbox, prefer conditionals if available
         if model_name == "chatterbox":
