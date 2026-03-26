@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import logging
 import pickle
 import re
 import shutil
@@ -14,9 +13,8 @@ from pathlib import Path
 from typing import Any
 
 import soundfile as sf
+from loguru import logger
 from pydantic import BaseModel
-
-logger = logging.getLogger(__name__)
 
 MAX_REFERENCE_SIZE = 50 * 1024 * 1024  # 50 MB
 MIN_DURATION_S = 3.0
@@ -72,6 +70,7 @@ def _convert_to_wav(audio_bytes: bytes, original_filename: str) -> bytes:
         src_path, dst_path = src.name, dst.name
 
     try:
+        logger.debug(f"Converting {original_filename!r} → WAV via ffmpeg")
         result = subprocess.run(
             [
                 "ffmpeg", "-y",
@@ -85,6 +84,7 @@ def _convert_to_wav(audio_bytes: bytes, original_filename: str) -> bytes:
         )
         if result.returncode != 0:
             stderr = result.stderr.decode(errors="replace")
+            logger.warning(f"ffmpeg returned non-zero for {original_filename!r}: {stderr!r}")
             raise ValueError(f"ffmpeg conversion failed: {stderr[:200]}")
         return Path(dst_path).read_bytes()
     finally:
@@ -126,6 +126,7 @@ def _validate_reference_audio(
             f"Reference audio too long: {duration_s:.1f}s (max {max_duration_s}s)"
         )
 
+    logger.debug(f"Validated audio: {duration_s:.1f}s @ {sample_rate}Hz")
     return wav_bytes, duration_s, sample_rate
 
 
@@ -146,6 +147,7 @@ class VoiceStore:
         self._scan()
 
     def _scan(self) -> None:
+        logger.debug(f"Scanning voice store at {str(self._base_dir)!r}")
         self._index.clear()
         for meta_path in self._base_dir.glob("*/metadata.json"):
             try:
@@ -154,6 +156,7 @@ class VoiceStore:
                 self._index[meta.voice_id] = meta
             except Exception:
                 logger.warning("Skipping corrupt voice metadata: %s", meta_path)
+        logger.debug(f"Loaded {len(self._index)} voice(s) from disk")
 
     def list_voices(self, model: str | None = None) -> list[VoiceMetadata]:
         voices = sorted(self._index.values(), key=lambda v: v.name)
@@ -207,7 +210,9 @@ class VoiceStore:
         wav_bytes, duration_s, sample_rate = _validate_reference_audio(
             audio_bytes, original_filename, max_duration_s=max_duration_s
         )
+        logger.debug(f"Computing SHA-256 for {original_filename!r}")
         wav_sha256 = hashlib.sha256(wav_bytes).hexdigest()
+        logger.debug(f"SHA-256: {wav_sha256}")
 
         voice_dir = self._base_dir / voice_id
         voice_dir.mkdir(parents=True, exist_ok=False)

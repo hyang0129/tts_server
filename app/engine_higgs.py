@@ -4,6 +4,8 @@ import os
 import subprocess as _sp
 from pathlib import Path
 
+from loguru import logger
+
 from app.engine_base import SubprocessEngine
 
 _raw_quant = os.environ.get("HIGGS_QUANT_BITS", "8").strip().lower()
@@ -24,14 +26,17 @@ class HiggsEngine(SubprocessEngine):
     _worker_python = "/workspaces/.venvs/tts_server-higgs/bin/python"
 
     def _probe_deps(self) -> bool:
+        logger.debug(f"Probing higgs deps at {self._worker_python!r}")
         higgs_repo = os.environ.get("HIGGS_REPO_PATH", "/tmp/faster-higgs-audio")
         probe = (
             f"import sys; sys.path.insert(0, {higgs_repo!r}); import boson_multimodal"
         )
         try:
-            return _sp.run(
+            result = _sp.run(
                 [self._worker_python, "-c", probe],
                 capture_output=True, timeout=10
             ).returncode == 0
         except Exception:
-            return False
+            result = False
+        logger.debug(f"higgs deps available: {result}")
+        return result
