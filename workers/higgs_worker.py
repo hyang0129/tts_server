@@ -44,6 +44,11 @@ if _raw_quant in ("0", "none", "false", "off"):
 else:
     QUANTIZATION_BITS = int(_raw_quant)
 
+# Attention implementation: "sdpa" (default), "flash_attention_2", or "eager".
+# "sdpa" uses torch's built-in scaled_dot_product_attention — faster than eager
+# with no extra packages. "flash_attention_2" requires flash_attn to be installed.
+ATTN_IMPL = os.environ.get("HIGGS_ATTN_IMPL", "sdpa").strip().lower()
+
 DEFAULT_SCENE = "Audio is recorded from a quiet room."
 
 _SAMPLE_RATE = 24000
@@ -61,6 +66,30 @@ def _cmd_ping() -> None:
     send_ok()
 
 
+def _patch_attn_impl() -> None:
+    """Monkey-patch HiggsAudioModel.from_pretrained to inject attn_implementation.
+
+    HiggsAudioModelClient doesn't expose attn_implementation as a constructor arg,
+    so we wrap from_pretrained to inject it before each call.  Only active when
+    ATTN_IMPL differs from the transformers default ("eager").
+    """
+    if ATTN_IMPL == "eager":
+        return
+    from boson_multimodal.model.higgs_audio.modeling_higgs_audio import (  # type: ignore[import]
+        HiggsAudioModel,
+    )
+
+    _orig_func = HiggsAudioModel.from_pretrained.__func__  # type: ignore[attr-defined]
+
+    @classmethod  # type: ignore[misc]
+    def _patched(cls, *args, **kwargs):  # type: ignore[misc]
+        kwargs.setdefault("attn_implementation", ATTN_IMPL)
+        return _orig_func(cls, *args, **kwargs)
+
+    HiggsAudioModel.from_pretrained = _patched  # type: ignore[method-assign]
+    print(f"higgs_worker: attn_implementation={ATTN_IMPL!r}", file=sys.stderr, flush=True)
+
+
 def _cmd_load() -> None:
     global _client, _audio_tokenizer
     _ensure_higgs_path()
@@ -70,6 +99,7 @@ def _cmd_load() -> None:
     )
     from examples.generation import HiggsAudioModelClient  # type: ignore[import]
 
+    _patch_attn_impl()
     _audio_tokenizer = load_higgs_audio_tokenizer(TOKENIZER_ID, device=DEVICE)
     _client = HiggsAudioModelClient(
         model_path=MODEL_ID,
