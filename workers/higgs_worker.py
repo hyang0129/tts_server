@@ -49,11 +49,6 @@ else:
 # "sdpa" uses torch's built-in scaled_dot_product_attention — no extra packages.
 _VALID_ATTN_IMPLS = {"flash_attention_2", "sdpa", "eager"}
 ATTN_IMPL = os.environ.get("HIGGS_ATTN_IMPL", "flash_attention_2").strip().lower()
-if ATTN_IMPL not in _VALID_ATTN_IMPLS:
-    raise ValueError(
-        f"HIGGS_ATTN_IMPL={ATTN_IMPL!r} is not valid. "
-        f"Must be one of: {', '.join(sorted(_VALID_ATTN_IMPLS))}"
-    )
 
 DEFAULT_SCENE = "Audio is recorded from a quiet room."
 
@@ -101,6 +96,11 @@ def _patch_attn_impl() -> None:
 
 def _cmd_load() -> None:
     global _client, _audio_tokenizer
+    if ATTN_IMPL not in _VALID_ATTN_IMPLS:
+        raise ValueError(
+            f"HIGGS_ATTN_IMPL={ATTN_IMPL!r} is not valid. "
+            f"Must be one of: {', '.join(sorted(_VALID_ATTN_IMPLS))}"
+        )
     _ensure_higgs_path()
 
     from boson_multimodal.audio_processing.higgs_audio_tokenizer import (  # type: ignore[import]

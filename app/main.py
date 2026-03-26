@@ -337,16 +337,16 @@ async def synthesize(req: TTSRequest) -> Response:
         f"TTS request: model={req.model}, voice_id={req.voice},"
         f" text_len={len(req.text)}, text={req.text[:80]!r}"
     )
+    t0 = time.perf_counter()
     async with app.state.lock:
         engine = await manager.ensure_loaded(model_name)
-        t0 = time.perf_counter()
         audio, sr = await engine.generate(
             text=req.text,
             voice_ref_path=voice_ref_path,
             voice_ref_text=voice_ref_text,
             **params,
         )
-        elapsed = time.perf_counter() - t0
+    elapsed = time.perf_counter() - t0
     logger.info(f"TTS complete: model={req.model}, generate_ms={elapsed * 1000:.1f}")
 
     headers = _audio_headers(audio, sr)
