@@ -23,7 +23,6 @@ from __future__ import annotations
 import base64
 import json
 import os
-import struct
 import subprocess
 import sys
 import time
@@ -112,8 +111,6 @@ def _run_one(attn_impl: str, out_path: Path, env: dict[str, str]) -> dict[str, f
     worker_env = {**os.environ, **env, "HIGGS_ATTN_IMPL": attn_impl, "HIGGS_QUANT_BITS": "4"}
 
     print(f"\n[{attn_impl}] Starting worker...")
-    t_start = time.monotonic()
-
     proc = subprocess.Popen(
         [str(WORKER_PYTHON), str(WORKER_SCRIPT)],
         stdin=subprocess.PIPE,

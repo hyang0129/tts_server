@@ -11,12 +11,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import numpy as np
 import soundfile as sf
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from loguru import logger
@@ -34,6 +31,8 @@ from app.voices import (
     VoiceStore,
     _slugify,
 )
+
+load_dotenv()
 
 
 class InterceptHandler(logging.Handler):
