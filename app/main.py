@@ -19,20 +19,22 @@ from fastapi.responses import Response
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.engine_chatterbox import ChatterboxEngine
-from app.engine_chatterbox_full import ChatterboxFullEngine
-from app.engine_higgs import HiggsEngine
-from app.engine_qwen3 import Qwen3Engine
-from app.model_manager import ModelManager
-from app.voices import (
+# load_dotenv() must run before app.* imports: engine files read os.environ at module level
+# (HIGGS_QUANT_BITS, HIGGS_WORKER_PYTHON, QWEN3_MODEL_ID, etc. are module-level constants).
+load_dotenv()
+
+from app.engine_chatterbox import ChatterboxEngine  # noqa: E402
+from app.engine_chatterbox_full import ChatterboxFullEngine  # noqa: E402
+from app.engine_higgs import HiggsEngine  # noqa: E402
+from app.engine_qwen3 import Qwen3Engine  # noqa: E402
+from app.model_manager import ModelManager  # noqa: E402
+from app.voices import (  # noqa: E402
     DEFAULT_MAX_DURATION_S,
     VoiceListResponse,
     VoiceMetadata,
     VoiceStore,
     _slugify,
 )
-
-load_dotenv()
 
 
 class InterceptHandler(logging.Handler):
