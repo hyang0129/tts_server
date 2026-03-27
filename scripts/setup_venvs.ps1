@@ -156,6 +156,20 @@ Write-Host ""
 if ($anyFailed) {
     Write-Host "==> Some installs failed. Check output above."
     exit 1
-} else {
-    Write-Host "==> All venvs ready. Start with: .\start_server.ps1"
 }
+
+# ---------------------------------------------------------------------------
+# Step 4: Install flash-attn into the higgs venv (must run after torch is ready).
+# --no-build-isolation lets it link against the already-installed torch headers.
+# ---------------------------------------------------------------------------
+Write-Host "--- Installing flash-attn into higgs venv (compiles from source, ~5-10 min) ---"
+$HiggsPip = Join-Path $HiggsVenv "Scripts\pip.exe"
+$faResult = & $HiggsPip install flash-attn --no-build-isolation 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[warn] flash-attn build failed — Higgs will fall back to SDPA attention"
+    Write-Host "       Details: $($faResult | Select-Object -Last 5 | Out-String)"
+} else {
+    Write-Host "[ok]   flash-attn installed"
+}
+Write-Host ""
+Write-Host "==> All venvs ready. Start with: .\start_server.ps1"
