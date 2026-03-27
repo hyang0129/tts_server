@@ -24,9 +24,20 @@ The server targets **one model in VRAM at a time**. Recommended VRAM budget is 1
 
 The Higgs engine depends on this repo and it is not available on PyPI.
 
-```bash
+**Windows:**
+```powershell
 git clone https://github.com/sorbetstudio/faster-higgs-audio %USERPROFILE%\tmp\faster-higgs-audio
 ```
+
+**Linux / WSL / dev container:**
+```bash
+git clone https://github.com/sorbetstudio/faster-higgs-audio /tmp/faster-higgs-audio
+```
+
+> **Important (Linux):** The default `HIGGS_REPO_PATH` in the worker falls back to a Windows
+> path (`%USERPROFILE%\tmp\...`) when `USERPROFILE` is unset. On Linux you **must** set
+> `HIGGS_REPO_PATH` explicitly in `.env` — see Section 4. Without it every Higgs request
+> returns HTTP 500 with `ModuleNotFoundError: No module named 'boson_multimodal'`.
 
 ### 2.2 Create and activate the venv
 
@@ -184,7 +195,10 @@ AVAILABLE_VRAM_MB=10000
 HIGGS_QUANT_BITS=8
 
 # Path to the cloned faster-higgs-audio repo (step 2.1).
+# Windows default — works when USERPROFILE is set:
 HIGGS_REPO_PATH=%USERPROFILE%\tmp\faster-higgs-audio
+# Linux / WSL / dev container — MUST be set explicitly (no USERPROFILE fallback):
+# HIGGS_REPO_PATH=/tmp/faster-higgs-audio
 
 # HuggingFace model and tokenizer IDs for Higgs Audio v2.
 HIGGS_MODEL_ID=bosonai/higgs-audio-v2-generation-3B-base
@@ -200,6 +214,7 @@ Additional variables (optional, defaults shown):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TTS_VOICES_DIR` | `./voices` | Directory for persisted voice embeddings |
+| `IDLE_TIMEOUT_S` | `60` | Seconds of inactivity before the active engine is unloaded. Increase to `600` when running long multi-block renders (default 60s can fire mid-generation if model load + synthesis exceeds the timeout). |
 
 ---
 
@@ -212,14 +227,37 @@ only. Engine subprocess workers are launched in their own venvs automatically by
 # From PowerShell (recommended):
 .\start_server.ps1
 
-# From Claude's bash tool:
+# From Claude's bash tool (invokes PowerShell on Windows):
 ./start_server.sh
 ```
 
 Default port is **8765**. VS Code port-forwarding can intercept processes started from bash/WSL;
 the PowerShell script avoids this by spawning a native Windows process.
 
-Models are lazy-loaded on first request. Startup is fast; the first `/tts` call will take 3–21 seconds while the model loads into VRAM.
+### Linux / WSL / dev container (no Windows PowerShell)
+
+When running fully inside a Linux container without access to `powershell.exe`, start uvicorn
+directly from the host venv:
+
+```bash
+cd /workspaces/hub_3/tts_server
+AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/python \
+    -m uvicorn app.main:app --host 127.0.0.1 --port 8765 \
+    >> tts_server.log 2>&1 &
+```
+
+**Required before starting:** ensure `HIGGS_REPO_PATH=/tmp/faster-higgs-audio` is in `.env`
+(see Section 2.1). Without it the Higgs worker cannot find `boson_multimodal` and every Higgs
+request returns HTTP 500.
+
+Confirm startup is complete by polling the health endpoint:
+
+```bash
+until curl -s http://127.0.0.1:8765/health | grep -q '"status":"ok"'; do sleep 3; done
+echo "Server ready"
+```
+
+Models are lazy-loaded on first request. Startup is fast (~15–20s for dep probes); the first `/tts` call will take 3–21 seconds while the model loads into VRAM.
 
 ## 5.5 Install voice fixtures
 
@@ -318,11 +356,19 @@ with a constant description and seed=0. Voice cloning (reference audio anchor) i
 for multi-block narration. The reference audio must be pre-cloned on the server before
 video_agent_long tests can run.
 
-**Setup order on a fresh machine:**
-1. Run venv setup: `powershell -ExecutionPolicy Bypass -File scripts\setup_venvs.ps1`
-2. Start tts_server: `.\start_server.ps1`
-3. Install fixtures: `.venv\Scripts\python tests\setup_test_voices.py`
-4. Run video_agent_long tests (or tts_server tests)
+**Setup order on a fresh machine (Windows):**
+1. Clone faster-higgs-audio: `git clone https://github.com/sorbetstudio/faster-higgs-audio %USERPROFILE%\tmp\faster-higgs-audio`
+2. Run venv setup: `powershell -ExecutionPolicy Bypass -File scripts\setup_venvs.ps1`
+3. Start tts_server: `.\start_server.ps1`
+4. Install fixtures: `.venv\Scripts\python tests\setup_test_voices.py`
+5. Run video_agent_long tests (or tts_server tests)
+
+**Setup order on a fresh machine (Linux / dev container):**
+1. Clone faster-higgs-audio: `git clone https://github.com/sorbetstudio/faster-higgs-audio /tmp/faster-higgs-audio`
+2. Add to `.env`: `HIGGS_REPO_PATH=/tmp/faster-higgs-audio`
+3. Start tts_server: `AVAILABLE_VRAM_MB=10000 /workspaces/.venvs/tts_server/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8765 >> tts_server.log 2>&1 &`
+4. Install fixtures: `/workspaces/.venvs/tts_server/bin/python tests/setup_test_voices.py`
+5. Run video_agent_long tests (or tts_server tests) with `TTS_SERVER_URL=http://127.0.0.1:8765`
 
 **Adding a new cross-repo fixture voice:** commit the reference audio to
 `tests/voice_fixtures/<id>/`, document it in the table above, and update

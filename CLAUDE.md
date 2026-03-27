@@ -136,6 +136,7 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 
 ## Environment variables
 - `AVAILABLE_VRAM_MB` — VRAM budget in MB (default 12000). Recommended: 10000.
+- `IDLE_TIMEOUT_S` — seconds before an idle engine is unloaded (default 60). Set to 600 for long multi-block renders — the default can fire mid-generation if model load + synthesis exceeds 60s.
 - `TTS_VOICES_DIR` — voice storage directory (default ./voices)
 - `HIGGS_QUANT_BITS` — quantization bits for higgs (4, 8, or 0 for bf16)
 - `HIGGS_ATTN_IMPL` — attention implementation for higgs (`sdpa` default, `flash_attention_2`, or `eager`). `flash_attention_2` requires `flash_attn` which does not build from source on Windows (CUTLASS/MSVC incompatibility); leave unset unless you have a pre-built wheel. `sdpa` uses torch's built-in SDPA kernel (no extra packages).
