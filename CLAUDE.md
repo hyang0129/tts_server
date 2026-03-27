@@ -138,7 +138,7 @@ The STT validation (`tests/stt_validate.py`) serves dual purpose: it checks tran
 - `AVAILABLE_VRAM_MB` — VRAM budget in MB (default 12000). Recommended: 10000.
 - `TTS_VOICES_DIR` — voice storage directory (default ./voices)
 - `HIGGS_QUANT_BITS` — quantization bits for higgs (4, 8, or 0 for bf16)
-- `HIGGS_ATTN_IMPL` — attention implementation for higgs (`flash_attention_2` default, `sdpa`, or `eager`). `flash_attention_2` requires `flash_attn` which is installed automatically by `scripts/setup_venvs.sh`. `sdpa` uses torch's built-in SDPA kernel (no extra packages — fallback if flash_attn build fails).
+- `HIGGS_ATTN_IMPL` — attention implementation for higgs (`sdpa` default, `flash_attention_2`, or `eager`). `flash_attention_2` requires `flash_attn` which does not build from source on Windows (CUTLASS/MSVC incompatibility); leave unset unless you have a pre-built wheel. `sdpa` uses torch's built-in SDPA kernel (no extra packages).
 - `HIGGS_REPO_PATH` — path to faster-higgs-audio repo (default %USERPROFILE%\tmp\faster-higgs-audio)
 - `HIGGS_WORKER_PYTHON` — override the Python interpreter used for the higgs subprocess worker (default: `.venvs/higgs/Scripts/python.exe` on Windows, `/workspaces/.venvs/tts_server-higgs/bin/python` on Linux)
 - `CB_WORKER_PYTHON` — override the Python interpreter used for the chatterbox subprocess worker (default: `.venvs/chatterbox/Scripts/python.exe` on Windows, `/workspaces/.venvs/tts_server-chatterbox/bin/python` on Linux)
