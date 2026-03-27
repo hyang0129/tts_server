@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import gc
+import os
 import time
 
 from loguru import logger
 
 from app.engine_base import TTSEngine
 
-IDLE_TIMEOUT_S = 60
+IDLE_TIMEOUT_S = int(os.environ.get("IDLE_TIMEOUT_S", "60"))
 IDLE_CHECK_INTERVAL_S = 10
 
 
